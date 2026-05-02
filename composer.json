@@ -1,12 +1,12 @@
 {
-    "name": "sergiodlopes/nataphp",
+    "name": "nataphp/core",
     "description": "NATAPHP - Another PHP framework. Nothing to see here.",
-    "type": "project",
+    "type": "library",
     "license": "MIT",
-    "homepage": "https://github.com/sergiodlopes/nataphp",
+    "homepage": "https://github.com/nataphp/core",
     "support": {
-        "issues": "https://github.com/sergiodlopes/nataphp/issues",
-        "source": "https://github.com/sergiodlopes/nataphp"
+        "issues": "https://github.com/nataphp/core/issues",
+        "source": "https://github.com/nataphp/core"
     },
     "authors": [
         {
@@ -15,11 +15,20 @@
         }
     ],
     "require": {
+        "php": ">=8.1",
         "doctrine/dbal": "^4.4.3",
         "ircmaxell/password-compat": "^1.0.4",
         "masterexploder/phpthumb": "^2.1",
         "phpmailer/phpmailer": "^7.0.2",
         "smarty/smarty": "^5.8.0"
+    },
+    "autoload": {
+        "psr-4": {
+            "Nata\\": "src/"
+        },
+        "files": [
+            "src/Error/exceptions.php"
+        ]
     },
     "config": {
         "sort-packages": true
