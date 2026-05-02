@@ -803,7 +803,7 @@ class View extends NataObject implements Listener {
     }
 
 /**
- * Load bundled Smarty plugins from NATA View/SmartyPlugin.
+ * Register bundled Smarty plugins on the given Smarty instance.
  *
  * @param Smarty $smarty Smarty instance
  * @return void

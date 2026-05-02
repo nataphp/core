@@ -110,11 +110,8 @@ class Dispatcher {
 
         if (!defined('ROOT')) {
             define('DS', DIRECTORY_SEPARATOR);
-            // This file: ROOT/Nata/Cron/Dispatcher.php — two levels above __DIR__ is ROOT.
-            define('ROOT', dirname(__DIR__, 2) . DS);
-            define('NATA_DIR', 'Nata');
             define('APP_DIR', 'src');
-            define('NATA', ROOT . NATA_DIR . DS);
+            define('ROOT', dirname(__DIR__, 2) . DS);
             define('APP', ROOT . APP_DIR . DS);
             define('TMP', ROOT . 'var' . DS);
             define('LOGS', TMP . 'logs' . DS);

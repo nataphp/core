@@ -281,7 +281,7 @@ class ClassLoader {
             if ($plugin) {
                 $path = static::_pluginPath($plugin) . DS;
             } else {
-                $path = (!$core ? ROOT : NATA);
+                $path = (!$core ? ROOT : dirname(__DIR__) . DS);
             }
 
             $path .= 'vendor' . DS;
@@ -362,7 +362,7 @@ class ClassLoader {
             if ($options['plugin']) {
                 $path = static::_pluginPath($options['plugin']);
             } else {
-                $path = rtrim((!$options['core'] ? ROOT : NATA), DS);
+                $path = rtrim((!$options['core'] ? ROOT : dirname(__DIR__)), DS);
             }
 
             $options['path'] = $path . DS . static::$_vendorDir;
@@ -506,8 +506,9 @@ class ClassLoader {
             $paths[] = APP . $location;
         }
 
-        if (is_dir(NATA . $location)) {
-            $paths[] = NATA . $location;
+        $frameworkSrc = dirname(__DIR__) . DS;
+        if (is_dir($frameworkSrc . $location)) {
+            $paths[] = $frameworkSrc . $location;
         }
 
         foreach ($paths as $path) {
@@ -530,7 +531,7 @@ class ClassLoader {
                      */
                     if (isset($classes[2]) && !empty($classes[2])) {
                         $pathinfo = pathinfo($filepath);
-                        $relativePath = str_replace(array(APP, NATA), '', $pathinfo['dirname']);
+                        $relativePath = str_replace([APP, dirname(__DIR__) . DS], '', $pathinfo['dirname']);
                         $arrayPath = str_replace(DS, '.', $relativePath);
                         $arrayPath = str_replace('Plugin.', '', $arrayPath);
 

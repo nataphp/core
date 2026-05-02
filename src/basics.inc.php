@@ -15,13 +15,6 @@
  * @license       http://www.opensource.org/licenses/mit-license.php MIT License
  */
 
-/**
- * Root directory of this package's `src/` tree (View/SmartyPlugin, legacy core paths).
- * Resolved here so applications do not define it; override only if needed before Composer loads this file.
- */
-    if (!defined('NATA')) {
-        define('NATA', __DIR__ . DIRECTORY_SEPARATOR);
-    }
 
 use Nata\I18n\I18n;
 use Nata\Core\Configure;
@@ -999,12 +992,6 @@ function base64url_decode($data) {
     );
 }
 
-/**
- * Compatibility with the password_* functions that ship with PHP 5.5
- */
-if (!function_exists('password_hash')) {
-    include NATA . 'vendor' . DS . 'password_compat' . DS . 'lib' . DS . 'password.php';
-}
 
 if (!function_exists('mb_stripos')) {
 

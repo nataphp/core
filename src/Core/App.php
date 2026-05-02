@@ -225,7 +225,7 @@ class App {
  * @return string Full path
  */
     public static function core($package) {
-        return NATA . static::ds($package);
+        return dirname(__DIR__) . DS . static::ds($package);
     }
 
 /**
