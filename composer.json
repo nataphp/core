@@ -1,0 +1,27 @@
+{
+    "name": "sergiodlopes/nataphp",
+    "description": "NATAPHP - Another PHP framework. Nothing to see here.",
+    "type": "project",
+    "license": "MIT",
+    "homepage": "https://github.com/sergiodlopes/nataphp",
+    "support": {
+        "issues": "https://github.com/sergiodlopes/nataphp/issues",
+        "source": "https://github.com/sergiodlopes/nataphp"
+    },
+    "authors": [
+        {
+            "name": "Sérgio Dinis Lopes",
+            "homepage": "https://github.com/sergiodlopes"
+        }
+    ],
+    "require": {
+        "doctrine/dbal": "^4.4.3",
+        "ircmaxell/password-compat": "^1.0.4",
+        "masterexploder/phpthumb": "^2.1",
+        "phpmailer/phpmailer": "^7.0.2",
+        "smarty/smarty": "^5.8.0"
+    },
+    "config": {
+        "sort-packages": true
+    }
+}

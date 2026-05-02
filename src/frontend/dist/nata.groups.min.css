@@ -1,0 +1,1 @@
+[data-group-content]{display:none}.group-row.open [data-group-content]{display:block}[data-group-toggle]{cursor:pointer;user-select:none;background-color:#f8f9fa}.group-row-chevron{display:inline-flex;align-items:center;transition:transform .2s ease;pointer-events:none}.group-row.open .group-row-chevron{transform:rotate(180deg)}

@@ -1,0 +1,149 @@
+@charset "utf-8";
+
+/* ============================================================
+   Nata Notifier — standalone toast notifications
+   No Bootstrap or external CSS dependency.
+   ============================================================ */
+
+/* ── Base container ───────────────────────────────────────── */
+
+.notifier {
+}
+
+
+.notifier {
+    position: fixed;
+    z-index: 9999999;
+    min-width: calc(100vw - 40px);
+    max-width: 420px;
+    padding: 12px 40px 12px 14px;
+    border-radius: 6px;
+    border-left: 4px solid transparent;
+    box-shadow: 0 4px 16px rgba(0, 0, 0, 0.14);
+    font-family: inherit;
+    font-size: 14px;
+    line-height: 1.5;
+    box-sizing: border-box;
+    opacity: 1;
+    pointer-events: auto;
+}
+
+/* ── Type variants ────────────────────────────────────────── */
+
+.notifier-info {
+    background-color: #e8f4fd;
+    border-left-color: #17a2b8;
+    color: #0c5460;
+}
+
+.notifier-success {
+    background-color: #d4edda;
+    border-left-color: #28a745;
+    color: #155724;
+}
+
+.notifier-warning {
+    background-color: #fff3cd;
+    border-left-color: #ffc107;
+    color: #7d5a00;
+}
+
+.notifier-danger {
+    background-color: #f8d7da;
+    border-left-color: #dc3545;
+    color: #721c24;
+}
+
+/* ── Inner layout ─────────────────────────────────────────── */
+
+.notifier-alert {
+    display: flex;
+    align-items: flex-start;
+    gap: 10px;
+}
+
+/* ── Icon ─────────────────────────────────────────────────── */
+
+.notifier-icon {
+    flex-shrink: 0;
+    display: flex;
+    align-items: center;
+    line-height: 1;
+    margin-top: 1px;
+}
+
+.notifier-icon svg {
+    width: 18px;
+    height: 18px;
+    fill: currentColor;
+    display: block;
+}
+
+.notifier-icon i {
+    font-size: 18px;
+    line-height: 1;
+}
+
+/* Large icon when a body line is present */
+
+.notifier-has-icon-large .notifier-icon svg {
+    width: 28px;
+    height: 28px;
+}
+
+.notifier-has-icon-large .notifier-icon i {
+    font-size: 28px;
+}
+
+/* ── Icon colour per type ─────────────────────────────────── */
+
+.notifier-info    .notifier-icon { color: #17a2b8; }
+.notifier-success .notifier-icon { color: #28a745; }
+.notifier-warning .notifier-icon { color: #e0a800; }
+.notifier-danger  .notifier-icon { color: #dc3545; }
+
+/* ── Text block ───────────────────────────────────────────── */
+
+.notifier-text {
+    flex: 1;
+    min-width: 0;
+}
+
+.notifier-text strong {
+    display: block;
+    font-weight: 600;
+}
+
+.notifier-body {
+    margin-top: 3px;
+    opacity: 0.9;
+}
+
+/* ── Close button ─────────────────────────────────────────── */
+
+.notifier-close {
+    position: absolute;
+    top: 8px;
+    right: 10px;
+    padding: 0;
+    background: none;
+    border: none;
+    font-size: 20px;
+    line-height: 1;
+    cursor: pointer;
+    color: inherit;
+    opacity: 0.55;
+    transition: opacity 150ms ease;
+}
+
+.notifier-close:hover,
+.notifier-close:focus {
+    opacity: 1;
+    outline: none;
+}
+
+@media (min-width: 768px) {
+    .notifier {
+        min-width: 400px;
+    }
+}

@@ -1,0 +1,24 @@
+# Composer
+/vendor/
+
+# Environment & local config
+.env
+.env.*
+!.env.example
+
+# PHP
+*.log
+.phpunit.result.cache
+.php-cs-fixer.cache
+
+# IDE / OS
+.idea/
+.vscode/
+*.swp
+*.swo
+Thumbs.db
+Desktop.ini
+
+# Optional: uncomment if compile/cache dirs exist at project root
+# /tmp/
+# /cache/

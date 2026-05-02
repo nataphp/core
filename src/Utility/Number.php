@@ -1,0 +1,513 @@
+<?php
+/**
+ * Cake Number Utility.
+ *
+ * Methods to make numbers more readable.
+ *
+ * CakePHP(tm) : Rapid Development Framework (http://cakephp.org)
+ * Copyright (c) Cake Software Foundation, Inc. (http://cakefoundation.org)
+ *
+ * Licensed under The MIT License
+ * For full copyright and license information, please see the LICENSE.txt
+ * Redistributions of files must retain the above copyright notice.
+ *
+ * @copyright     Copyright (c) Cake Software Foundation, Inc. (http://cakefoundation.org)
+ * @link          http://cakephp.org CakePHP(tm) Project
+ * @since         CakePHP(tm) v 0.10.0.1076
+ * @license       http://www.opensource.org/licenses/mit-license.php MIT License
+ */
+
+namespace Nata\Utility;
+
+use BadMethodCallException;
+use NataException;
+use Nata\I18n\I18n;
+use NumberFormatter;
+
+/**
+ * Number helper library.
+ *
+ * Methods to make numbers more readable.
+ */
+class Number {
+
+/**
+ * Default options for number formatting.
+ *
+ * @var array
+ */
+    protected static $_defaultFormat = [
+        'before' => '', 'places' => 0, 'thousands' => ',', 'decimals' => '.', 'after' => '', 'escape' => true,
+        'trailingZeros' => true
+    ];
+
+/**
+ * Currencies supported by the helper. You can add additional currency formats
+ * with Nata\Utility\Number::addFormat
+ *
+ * @var array
+ */
+    protected static $_currencies = [
+        'AUD' => [
+            'wholeSymbol' => '$', 'wholePosition' => 'before', 'fractionSymbol' => 'c', 'fractionPosition' => 'after',
+            'zero' => 0, 'places' => 2, 'thousands' => ',', 'decimals' => '.', 'negative' => '()', 'escape' => true,
+            'fractionExponent' => 2
+        ],
+        'CAD' => [
+            'wholeSymbol' => '$', 'wholePosition' => 'before', 'fractionSymbol' => 'c', 'fractionPosition' => 'after',
+            'zero' => 0, 'places' => 2, 'thousands' => ',', 'decimals' => '.', 'negative' => '()', 'escape' => true,
+            'fractionExponent' => 2
+        ],
+        'USD' => [
+            'wholeSymbol' => '$', 'wholePosition' => 'before', 'fractionSymbol' => 'c', 'fractionPosition' => 'after',
+            'zero' => 0, 'places' => 2, 'thousands' => ',', 'decimals' => '.', 'negative' => '()', 'escape' => true,
+            'fractionExponent' => 2
+        ],
+        'EUR' => [
+            'wholeSymbol' => '€', 'wholePosition' => 'before', 'fractionSymbol' => false, 'fractionPosition' => 'after',
+            'zero' => 0, 'places' => 2, 'thousands' => '.', 'decimals' => ',', 'negative' => '()', 'escape' => true,
+            'fractionExponent' => 0
+        ],
+        'GBP' => [
+            'wholeSymbol' => '£', 'wholePosition' => 'before', 'fractionSymbol' => 'p', 'fractionPosition' => 'after',
+            'zero' => 0, 'places' => 2, 'thousands' => ',', 'decimals' => '.', 'negative' => '()', 'escape' => true,
+            'fractionExponent' => 2
+        ],
+        'JPY' => [
+            'wholeSymbol' => '¥', 'wholePosition' => 'before', 'fractionSymbol' => false, 'fractionPosition' => 'after',
+            'zero' => 0, 'places' => 2, 'thousands' => ',', 'decimals' => '.', 'negative' => '()', 'escape' => true,
+            'fractionExponent' => 0
+        ],
+    ];
+
+/**
+ * Default options for currency formats
+ *
+ * @var array
+ */
+    protected static $_currencyDefaults = [
+        'wholeSymbol' => '', 'wholePosition' => 'before', 'fractionSymbol' => false, 'fractionPosition' => 'after',
+        'zero' => '0', 'places' => 2, 'thousands' => ',', 'decimals' => '.', 'negative' => '()', 'escape' => true,
+        'fractionExponent' => 2
+    ];
+
+/**
+ * Default currency used by CakeNumber::currency()
+ *
+ * @var string
+ */
+    protected static $_defaultCurrency = 'USD';
+
+/**
+ * If native number_format() should be used. If >= PHP5.4
+ *
+ * @var boolean
+ */
+    protected static $_numberFormatSupport = null;
+
+
+/**
+ * Formats a number with a level of precision.
+ *
+ * @param float $value A floating point number.
+ * @param integer $precision The precision of the returned number.
+ * @return float Formatted float.
+ * @link http://book.cakephp.org/2.0/en/core-libraries/helpers/number.html#Number::precision
+ */
+    public static function precision($value, $precision = 3) {
+        return sprintf("%01.{$precision}f", $value);
+    }
+
+/**
+ * Returns a formatted-for-humans file size.
+ *
+ * @param integer $size Size in bytes
+ * @return string Human readable size
+ * @link http://book.cakephp.org/2.0/en/core-libraries/helpers/number.html#Number::toReadableSize
+ */
+    public static function toReadableSize($size) {
+        switch (true) {
+            case $size < 1024:
+                return __n('%d Byte', '%d Bytes', $size, $size);
+            case round($size / 1024) < 1024:
+                return __('%s KB', static::precision($size / 1024, 0));
+            case round($size / 1024 / 1024, 2) < 1024:
+                return __('%s MB', static::precision($size / 1024 / 1024, 2));
+            case round($size / 1024 / 1024 / 1024, 2) < 1024:
+                return __('%s GB', static::precision($size / 1024 / 1024 / 1024, 2));
+            default:
+                return __('%s TB', static::precision($size / 1024 / 1024 / 1024 / 1024, 2));
+        }
+    }
+
+/**
+ * Converts filesize from human readable string to bytes
+ *
+ * @param string $size Size in human readable string like '5MB', '5M', '500B', '50kb' etc.
+ * @param mixed $default Value to be returned when invalid size was used, for example 'Unknown type'
+ * @return mixed Number of bytes as integer on success, `$default` on failure if not false
+ * @throws Nata\Error\Exception On invalid Unit type.
+ * @link http://book.cakephp.org/2.0/en/core-libraries/helpers/number.html#Number::fromReadableSize
+ */
+    public static function fromReadableSize($size, $default = false) {
+        if (ctype_digit($size)) {
+            return (int)$size;
+        }
+
+        $size = strtoupper($size);
+
+        $l = -2;
+        $i = array_search(substr($size, -2), ['KB', 'MB', 'GB', 'TB', 'PB']);
+        if ($i === false) {
+            $l = -1;
+            $i = array_search(substr($size, -1), ['K', 'M', 'G', 'T', 'P']);
+        }
+        if ($i !== false) {
+            $size = substr($size, 0, $l);
+            return $size * pow(1024, $i + 1);
+        }
+
+        if (substr($size, -1) === 'B' && ctype_digit(substr($size, 0, -1))) {
+            $size = substr($size, 0, -1);
+            return (int)$size;
+        }
+
+        if ($default !== false) {
+            return $default;
+        }
+
+        throw new NataException('No unit type.');
+    }
+
+/**
+ * Formats a number into a percentage string.
+ *
+ * Options:
+ *
+ * - `multiply`: Multiply the input value by 100 for decimal percentages.
+ *
+ * @param float $value A floating point number
+ * @param integer $precision The precision of the returned number
+ * @param array $options Options
+ * @return string Percentage string
+ * @link http://book.cakephp.org/2.0/en/core-libraries/helpers/number.html#Number::toPercentage
+ */
+    public static function toPercentage($value, $precision = 2, $options = []) {
+        $options += ['multiply' => false];
+        if ($options['multiply']) {
+            $value *= 100;
+        }
+        return static::precision($value, $precision) . '%';
+    }
+
+/**
+ * Formats a number.
+ *
+ * @param float $value A floating point number
+ * @param integer|array $options If integer then places, if string then before, if (,.-) then use it
+ *   or array with places and before keys
+ * @return string formatted number
+ * @link http://book.cakephp.org/2.0/en/core-libraries/helpers/number.html#Number::format
+ */
+    public static function format($value = null, $options = []) {
+        if (func_num_args() === 0) {
+            return static::$_defaultFormat;
+        } elseif (is_array($value)) {
+            return static::$_defaultFormat = $value + static::$_defaultFormat;
+        }
+
+        $separators = [',', '.', '-', ':'];
+
+        if (is_int($options)) {
+            $options = ['places' => $options];
+        }
+
+        if (is_string($options) && !in_array($options, $separators)) {
+            $options = ['before' => $options];
+        }
+
+        if (!is_array($options) && in_array($options, $separators)) {
+            $options = ['thousands' => $options];
+        }
+
+        if (!is_array($options) && in_array($options, $separators)) {
+            $options = ['decimals' => $options];
+        }
+
+        if (!is_array($options)) {
+            $options = [];
+        }
+
+        $options = $options + static::$_defaultFormat;
+
+        extract($options);
+
+        $out = number_format($value, $places, $decimals, $thousands);
+
+        if ($trailingZeros === false && strpos($out, $decimals) !== false) {
+            $out = rtrim(rtrim($out, '0'), $decimals);
+        }
+
+        $out = $before . $out . $after;
+
+        if ($escape) {
+            return h($out);
+        }
+
+        return $out;
+    }
+
+/**
+ * Unformat a number formatted by format().
+ *
+ * @param string $string Numeric string
+ * @param array|integer $options If integer then places, if string then before, if (,.-) then use it
+ *   or array with places and before keys
+ * @return float|int Float/int
+ */
+    public static function unformat($string, array $options = []) {
+        if (preg_match('/^[^\d]+/', $string)) {
+            return false;
+        }
+
+        $separators = [',', '.', '-', ':'];
+
+        if (is_int($options)) {
+            $options = ['places' => $options];
+        }
+
+        if (is_string($options) && !in_array($options, $separators)) {
+            $options = ['before' => $options];
+        }
+
+        if (!is_array($options) && in_array($options, $separators)) {
+            $options = ['thousands' => $options];
+        }
+
+        if (!is_array($options) && in_array($options, $separators)) {
+            $options = ['decimals' => $options];
+        }
+
+        if (!is_array($options)) {
+            $options = [];
+        }
+
+        $options = $options + static::$_defaultFormat;
+
+        extract($options);
+
+        $string = preg_replace('/^[^\d]+/', '', $string);
+        $type = (strpos($string, $decimals) === false) ? 'int' : 'float';
+        $string = str_replace([$decimals, $thousands], ['.', ''], $string);
+
+        settype($string, $type);
+
+        return $string;
+    }
+
+/**
+ * Spellout a given number in a given locale.
+ *
+ * @param string $string Number to spell out
+ * @param array $options Array with locale, before and after keys
+ * @return string Spelled out number
+ */
+    public static function spellOut($number, array $options = []) {
+        $options += [
+            'before' => '',
+            'after' => '',
+            'locale' => I18n::locale()
+        ] + static::$_defaultFormat;
+
+        extract($options);
+
+        if (!class_exists('\\NumberFormatter')) {
+            throw new BadMethodCallException('Number::spellOut() requires intl extension to be installed.');
+        }
+
+        $text = $options['before'];
+
+        $formatter = new NumberFormatter($options['locale'], NumberFormatter::SPELLOUT);
+        $text .= $formatter->format($number);
+
+        if ($options['after']) {
+            $text .= $options['after'];
+        }
+
+        return $text;
+    }
+
+/**
+ * Formats a number into a currency format to show deltas (signed differences in value).
+ *
+ * ### Options
+ *
+ * - `places` - Number of decimal places to use. ie. 2
+ * - `fractionExponent` - Fraction exponent of this specific currency. Defaults to 2.
+ * - `before` - The string to place before whole numbers. ie. '['
+ * - `after` - The string to place after decimal numbers. ie. ']'
+ * - `thousands` - Thousands separator ie. ','
+ * - `decimals` - Decimal separator symbol ie. '.'
+ *
+ * @param float $value A floating point number
+ * @param array $options
+ * @return string formatted delta
+ * @link http://book.cakephp.org/2.0/en/core-libraries/helpers/number.html#Number::formatDelta
+ */
+    public static function formatDelta($value, $options = []) {
+        $places = isset($options['places']) ? $options['places'] : 0;
+        $value = number_format($value, $places, '.', '');
+        $sign = $value > 0 ? '+' : '';
+        $options['before'] = isset($options['before']) ? $options['before'] . $sign : $sign;
+        return static::format($value, $options);
+    }
+
+/**
+ * Formats a number into a currency format.
+ *
+ * ### Options
+ *
+ * - `wholeSymbol` - The currency symbol to use for whole numbers,
+ *   greater than 1, or less than -1.
+ * - `wholePosition` - The position the whole symbol should be placed
+ *   valid options are 'before' & 'after'.
+ * - `fractionSymbol` - The currency symbol to use for fractional numbers.
+ * - `fractionPosition` - The position the fraction symbol should be placed
+ *   valid options are 'before' & 'after'.
+ * - `before` - The currency symbol to place before whole numbers
+ *   ie. '$'. `before` is an alias for `wholeSymbol`.
+ * - `after` - The currency symbol to place after decimal numbers
+ *   ie. 'c'. Set to boolean false to use no decimal symbol.
+ *   eg. 0.35 => $0.35. `after` is an alias for `fractionSymbol`
+ * - `zero` - The text to use for zero values, can be a
+ *   string or a number. ie. 0, 'Free!'
+ * - `places` - Number of decimal places to use. ie. 2
+ * - `fractionExponent` - Fraction exponent of this specific currency. Defaults to 2.
+ * - `thousands` - Thousands separator ie. ','
+ * - `decimals` - Decimal separator symbol ie. '.'
+ * - `negative` - Symbol for negative numbers. If equal to '()',
+ *   the number will be wrapped with ( and )
+ * - `escape` - Should the output be escaped for html special characters.
+ *   The default value for this option is controlled by the currency settings.
+ *   By default all currencies contain utf-8 symbols and don't need this changed. If you require
+ *   non HTML encoded symbols you will need to update the settings with the correct bytes.
+ *
+ * @param float $value
+ * @param string $currency Shortcut to default options. Valid values are
+ *   'USD', 'EUR', 'GBP', otherwise set at least 'before' and 'after' options.
+ * @param array $options
+ * @return string Number formatted as a currency.
+ * @link http://book.cakephp.org/2.0/en/core-libraries/helpers/number.html#Number::currency
+ */
+    public static function currency($value, $currency = null, $options = []) {
+        $default = static::$_currencyDefaults;
+        if ($currency === null) {
+            $currency = static::defaultCurrency();
+        }
+
+        if (isset(static::$_currencies[$currency])) {
+            $default = static::$_currencies[$currency];
+        } elseif (is_string($currency)) {
+            $options['before'] = $currency;
+        }
+
+        $options = array_merge($default, $options);
+
+        if (isset($options['before']) && $options['before'] !== '') {
+            $options['wholeSymbol'] = $options['before'];
+        }
+        if (isset($options['after']) && !$options['after'] !== '') {
+            $options['fractionSymbol'] = $options['after'];
+        }
+
+        $result = $options['before'] = $options['after'] = null;
+
+        $symbolKey = 'whole';
+        $value = (float)$value;
+        if (!$value) {
+            if ($options['zero'] !== 0) {
+                return $options['zero'];
+            }
+        } elseif ($value < 1 && $value > -1) {
+            if ($options['fractionSymbol'] !== false) {
+                $multiply = pow(10, $options['fractionExponent']);
+                $value = $value * $multiply;
+                $options['places'] = null;
+                $symbolKey = 'fraction';
+            }
+        }
+
+        $position = $options[$symbolKey . 'Position'] !== 'after' ? 'before' : 'after';
+        $options[$position] = $options[$symbolKey . 'Symbol'];
+
+        $abs = abs($value);
+        $result = static::format($abs, $options);
+
+        if ($value < 0) {
+            if ($options['negative'] === '()') {
+                $result = '(' . $result . ')';
+            } else {
+                $result = $options['negative'] . $result;
+            }
+        }
+        return $result;
+    }
+
+/**
+ * Add a currency format to the Number helper. Makes reusing
+ * currency formats easier.
+ *
+ * {{{ $number->addFormat('NOK', array('before' => 'Kr. ')); }}}
+ *
+ * You can now use `NOK` as a shortform when formatting currency amounts.
+ *
+ * {{{ $number->currency($value, 'NOK'); }}}
+ *
+ * Added formats are merged with the defaults defined in Nata\Utility\Number::$_currencyDefaults
+ * See Nata\Utility\Number::currency() for more information on the various options and their function.
+ *
+ * @param string $formatName The format name to be used in the future.
+ * @param array $options The array of options for this format.
+ * @return void
+ * @see Number::currency()
+ * @link http://book.cakephp.org/2.0/en/core-libraries/helpers/number.html#Number::addFormat
+ */
+    public static function addFormat($formatName, $options) {
+        static::$_currencies[$formatName] = $options + static::$_currencyDefaults;
+    }
+
+/**
+ * Getter/setter for default currency
+ *
+ * @param string $currency Default currency string used by currency() if $currency argument is not provided
+ * @return string Currency
+ * @link http://book.cakephp.org/2.0/en/core-libraries/helpers/number.html#Number::defaultCurrency
+ */
+    public static function defaultCurrency($currency = null) {
+        if ($currency) {
+            static::$_defaultCurrency = $currency;
+        }
+        return static::$_defaultCurrency;
+    }
+
+/**
+ * Extract number(s) from string and typecasts
+ * to int or float, accordingly.
+ *
+ * @param string $string String with numbers
+ * @return string Numberic string
+ */
+    public static function extractFrom($string, $decimal = '.') {
+        $number = null;
+
+        $regex = sprintf("/((?:[0-9]+,)*[0-9]+(?:\%s[0-9]+)?)/", $decimal);
+        if (preg_match_all($regex, $string, $matches) > 0) {
+            if (isset($matches[1])) {
+                $number = $matches[1][0];
+            }
+        }
+
+        return $number;
+    }
+
+}
