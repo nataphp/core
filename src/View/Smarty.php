@@ -20,6 +20,7 @@ namespace Nata\View;
 use Nata\Core\App;
 use Nata\Core\Configure;
 use Nata\I18n\I18n;
+use Nata\View\Smarty\NataSmartyExtension;
 use Smarty\Smarty as SmartyClass;
 use Smarty\Exception as SmartyException;
 use Smarty\CompilerException as SmartyCompilerException;
@@ -552,6 +553,10 @@ class Smarty extends View {
     protected function _smarty() {
         if ($this->_smarty === null) {
             $this->_smarty = new SmartyClass;
+
+            $extensions = $this->_smarty->getExtensions();
+            array_unshift($extensions, new NataSmartyExtension());
+            $this->_smarty->setExtensions($extensions);
 
             $this->_smarty->compile_check = $this->compileCheck();
             $this->_smarty->force_compile = $this->forceCompile();
