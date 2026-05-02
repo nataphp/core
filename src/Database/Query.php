@@ -29,6 +29,7 @@ use Nata\Database\Exception\DatabaseException;
 use Nata\Database\Query\ParameterManager;
 use Nata\Database\Query\Upsert;
 use Nata\Routing\Router;
+use ReflectionProperty;
 
 /**
  * Query builder abstraction for Doctrine Query Builder.
@@ -249,8 +250,196 @@ class Query {
  * @return $this|array
  */
     protected function _clearClause($clause) {
-        $this->_loadBuilder()->resetQueryPart($clause);
+        $builder = $this->_loadBuilder();
+        switch ($clause) {
+            case 'where':
+                $builder->resetWhere();
+                break;
+            case 'groupBy':
+                $builder->resetGroupBy();
+                break;
+            case 'having':
+                $builder->resetHaving();
+                break;
+            case 'orderBy':
+                $builder->resetOrderBy();
+                break;
+            case 'select':
+                $this->_dbalSetPrivate($builder, 'select', []);
+                $this->_dbalSetPrivate($builder, 'sql', null);
+                break;
+            case 'from':
+                $this->_dbalSetPrivate($builder, 'from', []);
+                $this->_dbalSetPrivate($builder, 'join', []);
+                $this->_dbalSetPrivate($builder, 'sql', null);
+                break;
+            case 'values':
+                $this->_dbalSetPrivate($builder, 'values', []);
+                $this->_dbalSetPrivate($builder, 'sql', null);
+                break;
+            default:
+                if (method_exists($builder, 'resetQueryPart')) {
+                    $builder->resetQueryPart($clause);
+                    break;
+                }
+                throw new BadMethodCallException('Cannot reset query clause: ' . $clause);
+        }
         $this->getParameterManager()->clear($clause);
+    }
+
+/**
+ * @param \Doctrine\DBAL\Query\QueryBuilder $object
+ */
+    private function _dbalGetPrivate(object $object, string $property): mixed {
+        $ref = new ReflectionProperty($object, $property);
+        $ref->setAccessible(true);
+
+        return $ref->getValue($object);
+    }
+
+/**
+ * @param \Doctrine\DBAL\Query\QueryBuilder $object
+ */
+    private function _dbalSetPrivate(object $object, string $property, mixed $value): void {
+        $ref = new ReflectionProperty($object, $property);
+        $ref->setAccessible(true);
+        $ref->setValue($object, $value);
+    }
+
+/**
+ * Map Doctrine DBAL 4 From value objects to legacy array shape.
+ *
+ * @param list<\Doctrine\DBAL\Query\From> $fromList
+ * @return array<int, array{table: string, alias: ?string}>
+ */
+    private function _dbalMapFromParts(array $fromList): array {
+        $out = [];
+        foreach ($fromList as $from) {
+            $out[] = ['table' => $from->table, 'alias' => $from->alias];
+        }
+
+        return $out;
+    }
+
+/**
+ * Legacy JOIN map compatible with historical getQueryPart('join') consumers.
+ *
+ * @param array<string, list<\Doctrine\DBAL\Query\Join>> $joinByAlias
+ * @return array<string, list<array{joinType: string, joinTable: string, joinAlias: string, joinCondition: ?string}>>
+ */
+    private function _dbalLegacyJoinMap(array $joinByAlias): array {
+        $legacy = [];
+        foreach ($joinByAlias as $parentAlias => $joins) {
+            foreach ($joins as $j) {
+                $legacy[$parentAlias][] = [
+                    'joinType' => strtolower($j->type),
+                    'joinTable' => $j->table,
+                    'joinAlias' => $j->alias,
+                    'joinCondition' => $j->condition,
+                ];
+            }
+        }
+
+        return $legacy;
+    }
+
+/**
+ * Read query parts in shapes similar to Doctrine DBAL 2/3 QueryBuilder getters.
+ *
+ * @param \Doctrine\DBAL\Query\QueryBuilder $qb
+ * @return array<string, mixed>|mixed
+ */
+    private function _dbalGetQueryPart(QueryBuilder $qb, ?string $clause = null) {
+        if ($clause === null) {
+            return [
+                'select' => $this->_dbalGetPrivate($qb, 'select'),
+                'from' => $this->_dbalMapFromParts($this->_dbalGetPrivate($qb, 'from')),
+                'join' => $this->_dbalLegacyJoinMap($this->_dbalGetPrivate($qb, 'join')),
+                'where' => $this->_dbalStringifyPredicate($this->_dbalGetPrivate($qb, 'where')),
+                'groupBy' => $this->_dbalGetPrivate($qb, 'groupBy'),
+                'having' => $this->_dbalStringifyPredicate($this->_dbalGetPrivate($qb, 'having')),
+                'orderBy' => $this->_dbalGetPrivate($qb, 'orderBy'),
+                'set' => $this->_dbalGetPrivate($qb, 'set'),
+                'values' => $this->_dbalGetPrivate($qb, 'values'),
+            ];
+        }
+
+        return match ($clause) {
+            'select' => $this->_dbalGetPrivate($qb, 'select'),
+            'from' => $this->_dbalMapFromParts($this->_dbalGetPrivate($qb, 'from')),
+            'join' => $this->_dbalLegacyJoinMap($this->_dbalGetPrivate($qb, 'join')),
+            'where' => $this->_dbalStringifyPredicate($this->_dbalGetPrivate($qb, 'where')),
+            'groupBy' => $this->_dbalGetPrivate($qb, 'groupBy'),
+            'having' => $this->_dbalStringifyPredicate($this->_dbalGetPrivate($qb, 'having')),
+            'orderBy' => $this->_dbalGetPrivate($qb, 'orderBy'),
+            'set' => $this->_dbalGetPrivate($qb, 'set'),
+            'values' => $this->_dbalGetPrivate($qb, 'values'),
+            default => method_exists($qb, 'getQueryPart')
+                ? $qb->getQueryPart($clause)
+                : throw new BadMethodCallException('Unsupported query part: ' . $clause),
+        };
+    }
+
+    private function _dbalStringifyPredicate(mixed $predicate): string {
+        if ($predicate === null) {
+            return '';
+        }
+
+        return (string) $predicate;
+    }
+
+/**
+ * Apply legacy QueryBuilder::add($clause, ...) behaviour on DBAL 4.
+ *
+ * @param \Doctrine\DBAL\Query\QueryBuilder $qb
+ */
+    private function _dbalAdd(QueryBuilder $qb, string $clause, mixed $sqlPart, bool $append): void {
+        switch ($clause) {
+            case 'select':
+                $parts = (array)$sqlPart;
+                if (!$append) {
+                    if ($parts === []) {
+                        $this->_dbalSetPrivate($qb, 'select', []);
+                    } else {
+                        $qb->select(...$parts);
+                    }
+                } elseif ($parts !== []) {
+                    $qb->addSelect(...$parts);
+                }
+                break;
+            case 'groupBy':
+                $parts = (array)$sqlPart;
+                if (!$append) {
+                    if ($parts === []) {
+                        $qb->resetGroupBy();
+                    } else {
+                        $qb->groupBy(...$parts);
+                    }
+                } elseif ($parts !== []) {
+                    $qb->addGroupBy(...$parts);
+                }
+                break;
+            case 'orderBy':
+                $chunk = (string)$sqlPart;
+                $current = $append ? $this->_dbalGetPrivate($qb, 'orderBy') : [];
+                $current[] = $chunk;
+                $this->_dbalSetPrivate($qb, 'orderBy', $current);
+                break;
+            case 'set':
+                $assignment = (string)$sqlPart;
+                $current = $append ? $this->_dbalGetPrivate($qb, 'set') : [];
+                $current[] = $assignment;
+                $this->_dbalSetPrivate($qb, 'set', $current);
+                break;
+            default:
+                if (method_exists($qb, 'add')) {
+                    $qb->add($clause, $sqlPart, $append);
+                    break;
+                }
+                throw new BadMethodCallException('Unsupported generic query part: ' . $clause);
+        }
+
+        $this->_dbalSetPrivate($qb, 'sql', null);
     }
 
 /**
@@ -351,12 +540,13 @@ class Query {
             'order' => 'orderBy'
         ];
 
-        if (isset($map[$clause])) {
+        if ($clause !== null && isset($map[$clause])) {
             $clause = $map[$clause];
         }
 
         $builder = $this->_loadBuilder();
-        return $clause === null ? $builder->getQueryParts() : $builder->getQueryPart($clause);
+
+        return $this->_dbalGetQueryPart($builder, $clause);
     }
 
 /**
@@ -368,12 +558,15 @@ class Query {
     public function select($select = null) {
         $builder = $this->_loadBuilder();
         if ($select === null) {
-            return $builder->getQueryPart('select');
+            return $this->_dbalGetQueryPart($builder, 'select');
         }
 
         $this->_clearClause('select');
         $select = is_array($select) ? $select : func_get_args();
-        $builder->add('select', $this->_selectExpression($select));
+        $parts = $this->_selectExpression($select);
+        if ($parts !== []) {
+            $builder->select(...$parts);
+        }
 
         return $this;
     }
@@ -386,7 +579,10 @@ class Query {
  */
     public function addSelect($select) {
         $select = is_array($select) ? $select : func_get_args();
-        $this->_loadBuilder()->add('select', $this->_selectExpression($select), true);
+        $parts = $this->_selectExpression($select);
+        if ($parts !== []) {
+            $this->_loadBuilder()->addSelect(...$parts);
+        }
         return $this;
     }
 
@@ -442,7 +638,7 @@ class Query {
  */
     public function from($table = null, $alias = null) {
         if ($table === null) {
-            return $this->_loadBuilder()->getQueryPart('from');
+            return $this->_dbalMapFromParts($this->_dbalGetPrivate($this->_loadBuilder(), 'from'));
         }
 
         if (is_string($table)) {
@@ -507,7 +703,7 @@ class Query {
  */
     public function join($table = null, $tableAlias = null, $conditions = null, $type = 'inner') {
         if (func_num_args() === 0) {
-            return $this->_loadBuilder()->getQueryPart('join');
+            return $this->_dbalLegacyJoinMap($this->_dbalGetPrivate($this->_loadBuilder(), 'join'));
         }
 
         $validTypes = ['inner', 'left', 'right'];
@@ -536,9 +732,17 @@ class Query {
             ));
         }
 
-        // Extract currently set FROM's alias
-        [$from] = $this->_loadBuilder()->getQueryPart('from');
-        if (!isset($from['alias']) || empty($from['alias'])) {
+        $fromMapped = $this->_dbalMapFromParts($this->_dbalGetPrivate($this->_loadBuilder(), 'from'));
+        if ($fromMapped === []) {
+            throw new InvalidArgumentException(sprintf(
+                "Missing FROM clause for use on JOIN of type '%s' on table '%s'.",
+                $type,
+                $join['table']
+            ));
+        }
+
+        $from = $fromMapped[0];
+        if (!isset($from['alias']) || $from['alias'] === null || $from['alias'] === '') {
             throw new InvalidArgumentException(sprintf(
                 "Missing FROM's table alias for use on JOIN of type '%s'.",
                 $type,
@@ -548,14 +752,8 @@ class Query {
 
         $expression = new QueryExpression($join['conditions']);
 
-        $this->_loadBuilder()->add('join', [
-            $from['alias'] => [
-                'joinType' => $type,
-                'joinTable' => $join['table'],
-                'joinAlias' => $join['alias'],
-                'joinCondition' => $expression->getSql()
-            ]
-        ], true);
+        $method = $type === 'left' ? 'leftJoin' : ($type === 'right' ? 'rightJoin' : 'innerJoin');
+        $this->_loadBuilder()->{$method}($from['alias'], $join['table'], $join['alias'], $expression->getSql());
 
         $this->getParameterManager()->add($expression->getParams(), 'join');
 
@@ -598,7 +796,7 @@ class Query {
     public function where($conditions = null) {
         $builder = $this->_loadBuilder();
         if (func_num_args() === 0) {
-            return $builder->getQueryPart('where');
+            return $this->_dbalGetQueryPart($builder, 'where');
         }
 
         $this->_clearClause('where');
@@ -665,7 +863,7 @@ class Query {
     public function having($conditions = null) {
         $builder = $this->_loadBuilder();
         if (func_num_args() === 0) {
-            return $builder->getQueryPart('having');
+            return $this->_dbalGetQueryPart($builder, 'having');
         }
 
         $this->_clearClause('having');
@@ -695,7 +893,7 @@ class Query {
         }
         $expr = new QueryExpression($conditions, 'AND', $this);
         if ($sql = $expr->getSql()) {
-            $this->_loadBuilder()->andWhere($sql);
+            $this->_loadBuilder()->andHaving($sql);
             $this->getParameterManager()->add($expr->getParams(), 'having');
         }
         return $this;
@@ -714,7 +912,7 @@ class Query {
 
         $expr = new QueryExpression($conditions, 'OR', $this);
         if ($sql = $expr->getSql()) {
-            $this->_loadBuilder()->orWhere($sql);
+            $this->_loadBuilder()->orHaving($sql);
             $this->getParameterManager()->add($expr->getParams(), 'having');
         }
         return $this;
@@ -728,13 +926,15 @@ class Query {
  */
     public function groupBy($fields = null) {
         if ($fields === null) {
-            return $this->_loadBuilder()->getQueryPart('groupBy');
+            return $this->_dbalGetQueryPart($this->_loadBuilder(), 'groupBy');
         }
 
         $this->_clearClause('groupBy');
 
         $fields = is_array($fields) ? $fields : func_get_args();
-        $this->_loadBuilder()->add('groupBy', $fields, false);
+        if ($fields !== []) {
+            $this->_loadBuilder()->groupBy(...$fields);
+        }
 
         return $this;
     }
@@ -749,7 +949,9 @@ class Query {
  */
     public function addGroupBy($fields) {
         $fields = is_array($fields) ? $fields : func_get_args();
-        $this->_loadBuilder()->add('groupBy', $fields, true);
+        if ($fields !== []) {
+            $this->_loadBuilder()->addGroupBy(...$fields);
+        }
         return $this;
     }
 
@@ -782,7 +984,7 @@ class Query {
  */
     public function order($fields = null, $sort = 'ASC') {
         if (func_num_args() === 0) {
-            return $this->_loadBuilder()->getQueryPart('orderBy');
+            return $this->_dbalGetQueryPart($this->_loadBuilder(), 'orderBy');
         }
 
         if ($fields === null || $fields === false) {
@@ -861,7 +1063,11 @@ class Query {
                     $order = $this->_escapeReservedKeyword($field) . ' ' . $direction;
                 }
 
-                $this->_loadBuilder()->add('orderBy', $order, true);
+                $qb = $this->_loadBuilder();
+                $current = $this->_dbalGetPrivate($qb, 'orderBy');
+                $current[] = $order;
+                $this->_dbalSetPrivate($qb, 'orderBy', $current);
+                $this->_dbalSetPrivate($qb, 'sql', null);
             }
 
         }
@@ -958,7 +1164,11 @@ class Query {
  */
     public function update($table = null, $alias = null) {
         $this->_type = 2;
-        $this->_loadBuilder()->update($table, $alias);
+        $tableSpec = $table;
+        if ($table !== null && $alias !== null && $alias !== '') {
+            $tableSpec = $table . ' ' . $alias;
+        }
+        $this->_loadBuilder()->update((string)$tableSpec);
         return $this;
     }
 
@@ -971,7 +1181,11 @@ class Query {
  */
     public function insert($table = null, $alias = null) {
         $this->_type = 3;
-        $this->_loadBuilder()->insert($table, $alias);
+        $tableSpec = (string)$table;
+        if ($alias !== null && $alias !== '') {
+            $tableSpec = $table . ' ' . $alias;
+        }
+        $this->_loadBuilder()->insert($tableSpec);
         return $this;
     }
 
@@ -997,7 +1211,7 @@ class Query {
     public function set($fields = null, $value = null) {
         $builder = $this->_loadBuilder();
         if ($fields === null) {
-            return $builder->getQueryPart('set');
+            return $this->_dbalGetQueryPart($builder, 'set');
         }
 
         if (is_string($fields)) {
@@ -1007,7 +1221,7 @@ class Query {
         foreach ($fields as $field => $value) {
             $comp = new Comparison($this->_escapeReservedKeyword($field), $value, Comparison::EQ, null, Comparison::SET);
             $sql = $comp->getSql();
-            $builder->add('set', $sql, true);
+            $this->_dbalAdd($builder, 'set', $sql, true);
             $this->getParameterManager()->add($comp->getParams(), 'set');
         }
 
@@ -1023,7 +1237,7 @@ class Query {
  */
     public function values($fields = null, $value = null) {
         if ($fields === null) {
-            return $this->_loadBuilder()->getQueryPart('values');
+            return $this->_dbalGetQueryPart($this->_loadBuilder(), 'values');
         }
 
         $this->_clearClause('values');
@@ -1111,7 +1325,7 @@ class Query {
  * @return $this Query builder instance.
  */
     public function add($clause, $sqlPart, $append = false) {
-        $this->_loadBuilder()->add($clause, $sqlPart, $append);
+        $this->_dbalAdd($this->_loadBuilder(), $clause, $sqlPart, $append);
         return $this;
     }
 

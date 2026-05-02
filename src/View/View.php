@@ -29,17 +29,14 @@ use Nata\Http\Request;
 use Nata\Http\Response;
 use Nata\Utility\Hash;
 use Nata\Utility\Inflector;
-use Nata\Core\ClassLoader;
 use Nata\I18n\I18n;
-use Smarty;
-use SmartyException;
-use SmartyCompilerException;
+use Nata\View\NataCacheResource;
+use Smarty\Smarty;
+use Smarty\Exception as SmartyException;
+use Smarty\CompilerException as SmartyCompilerException;
 use ViewException;
 use NataException;
 use RunTimeException;
-
-ClassLoader::registerClass('Smarty', 'Smarty/Smarty.class.php', true);
-ClassLoader::registerClass('Smarty_CacheResource_Natacache', 'Smarty/Smarty.class.php', true);
 
 /**
  * The View is the V in MVC.
@@ -806,9 +803,22 @@ class View extends NataObject implements Listener {
     }
 
 /**
+ * Load bundled Smarty plugins from NATA View/SmartyPlugin.
+ *
+ * @param Smarty $smarty Smarty instance
+ * @return void
+ */
+    protected function _registerNataSmartyPlugins(Smarty $smarty): void {
+        $dir = rtrim(NATA . App::ds('View/SmartyPlugin'), '/\\') . DIRECTORY_SEPARATOR;
+        if (is_dir($dir)) {
+            $smarty->addPluginsDir($dir);
+        }
+    }
+
+/**
  * Load/Get Smarty instance.
  *
- * @return \Smarty
+ * @return Smarty
  */
     public function _loadSmarty() {
         if ($this->_smarty === null) {
@@ -816,17 +826,18 @@ class View extends NataObject implements Listener {
 
             $this->_smarty->compile_check = $this->compileCheck();
             $this->_smarty->force_compile = $this->forceCompile();
-            $this->_smarty->inheritance_merge_compiled_includes = false;
+            $this->_smarty->merge_compiled_includes = false;
 
             $cacheBase = TMP . 'cache' . DS . 'smarty' . DS;
             $this->_smarty->setCompileDir($cacheBase . 'compile' . DS);
             $this->_smarty->setCacheDir($cacheBase . 'cache' . DS);
-            $this->_smarty->addPluginsDir(NATA . App::ds('View/SmartyPlugin'));
+            $this->_registerNataSmartyPlugins($this->_smarty);
+            $this->_smarty->registerFilter('pre', [I18nSmartyPrefilter::class, 'filter']);
 
             if ($this->_cacheConfig) {
+                $this->_smarty->registerCacheResource('natacache', new NataCacheResource($this->_cacheConfig));
+                $this->_smarty->merge_compiled_includes = true;
                 $this->_smarty->caching_type = 'natacache';
-                $this->_smarty->assign('natacache', $this->_cacheConfig);
-                $this->_smarty->inheritance_merge_compiled_includes = true;
                 $this->_smarty->setCaching(Smarty::CACHING_LIFETIME_SAVED);
                 $this->_smarty->setCacheLifetime($this->_cacheConfig['duration']);
             }

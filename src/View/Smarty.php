@@ -19,18 +19,14 @@ namespace Nata\View;
 
 use Nata\Core\App;
 use Nata\Core\Configure;
-use Nata\Core\ClassLoader;
 use Nata\I18n\I18n;
-use Smarty as SmartyClass;
-use SmartyException;
-use SmartyCompilerException;
+use Smarty\Smarty as SmartyClass;
+use Smarty\Exception as SmartyException;
+use Smarty\CompilerException as SmartyCompilerException;
 use ViewException;
 use NataException;
 use MissingTemplateException;
 use RunTimeException;
-
-ClassLoader::registerClass('Smarty', 'Smarty/Smarty.class.php', true);
-ClassLoader::registerClass('Smarty_CacheResource_Natacache', 'Smarty/Smarty.class.php', true);
 
 /**
  * The View is the V in MVC.

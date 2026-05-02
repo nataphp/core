@@ -177,7 +177,9 @@ class App {
                 ? ''
                 : substr($package, strlen('Template' . DS));
 
-            return ROOT . 'templates' . DS . $rest;
+            $base = is_dir(APP . 'Template') ? APP . 'Template' . DS : ROOT . 'templates' . DS;
+
+            return $base . $rest;
         }
 
         return APP . $package;

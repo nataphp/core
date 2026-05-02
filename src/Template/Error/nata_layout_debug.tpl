@@ -53,7 +53,7 @@
             {/block}
 
             {block name='footer'}
-                <p class="text-muted"><small>PHP {phpversion()} - NataPHP Framework</small></p>
+                <p class="text-muted"><small>PHP {phpversion} - NataPHP Framework</small></p>
             {/block}
         </div>
         <script src="//code.jquery.com/jquery-1.11.0.min.js"></script>
