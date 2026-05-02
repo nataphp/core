@@ -180,8 +180,7 @@ class Query extends DatabaseQuery implements JsonSerializable, IteratorAggregate
 /**
  * Constructor.
  *
- * @param string $name Name of table
- * @param mixed $connection Name of config for connection or connection instance
+ * @param \Nata\ORM\Table $table Table instance
  * @return void
  */
     public function __construct(Table $table) {
@@ -511,7 +510,13 @@ class Query extends DatabaseQuery implements JsonSerializable, IteratorAggregate
  * @return \Nata\ORM\Query
  */
     public function insert($table = null, $alias = null) {
-        return $this->_setTableAndAlias(__FUNCTION__, $table, $alias);
+        if ($table === null) {
+            $table = $this->_table;
+        }
+        // MySQL/MariaDB: INSERT must not use a table alias between the table name and
+        // the column list (e.g. INSERT INTO t1 t_alias (c) is invalid). ORM select/update
+        // use aliases; insert must use the table name only.
+        return parent::insert($table, null);
     }
 
 /**
