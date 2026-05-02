@@ -27,7 +27,8 @@
             "Nata\\": "src/"
         },
         "files": [
-            "src/Error/exceptions.php"
+            "src/Error/exceptions.php",
+            "src/basics.inc.php"
         ]
     },
     "config": {
