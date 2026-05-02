@@ -562,7 +562,7 @@ class Smarty extends View {
             $this->_smarty->setCacheDir($cacheBase . 'cache' . DS);
 
             if ($this->_cacheConfig) {
-                $this->_smarty->addPluginsDir(NATA . App::ds('View/SmartyPlugin'));
+                NataSmartyPlugins::register($this->_smarty);
                 $this->_smarty->caching_type = 'natacache';
                 $this->_smarty->inheritance_merge_compiled_includes = true;
                 $this->_smarty->setCaching(SmartyClass::CACHING_LIFETIME_SAVED);

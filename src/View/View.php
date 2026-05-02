@@ -809,10 +809,7 @@ class View extends NataObject implements Listener {
  * @return void
  */
     protected function _registerNataSmartyPlugins(Smarty $smarty): void {
-        $dir = rtrim(NATA . App::ds('View/SmartyPlugin'), '/\\') . DIRECTORY_SEPARATOR;
-        if (is_dir($dir)) {
-            $smarty->addPluginsDir($dir);
-        }
+        NataSmartyPlugins::register($smarty);
     }
 
 /**
@@ -832,7 +829,6 @@ class View extends NataObject implements Listener {
             $this->_smarty->setCompileDir($cacheBase . 'compile' . DS);
             $this->_smarty->setCacheDir($cacheBase . 'cache' . DS);
             $this->_registerNataSmartyPlugins($this->_smarty);
-            $this->_smarty->registerFilter('pre', [I18nSmartyPrefilter::class, 'filter']);
 
             if ($this->_cacheConfig) {
                 $this->_smarty->registerCacheResource('natacache', new NataCacheResource($this->_cacheConfig));
