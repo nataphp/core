@@ -792,11 +792,11 @@ function __rdx($domain, $context, $singular, $args = null) {
  * IIS, or SCRIPT_NAME in CGI mode).  Also exposes some additional custom
  * environment information.
  *
- * @param  string $key Environment variable name.
- * @return string Environment variable setting.
- * @link http://book.cakephp.org/2.0/en/core-libraries/global-constants-and-functions.html#env
+ * @param string $key Environment variable name.
+ * @param mixed $default Value to return when the variable is not set.
+ * @return mixed Environment variable setting, or $default if not found.
  */
-function env($key) {
+function env($key, $default = null) {
     if ($key === 'HTTPS') {
         if (isset($_SERVER['HTTPS'])) {
             return (!empty($_SERVER['HTTPS']) && $_SERVER['HTTPS'] !== 'off');
@@ -891,7 +891,7 @@ function env($key) {
             array_shift($parts);
             return '.' . implode('.', $parts);
     }
-    return null;
+    return $default;
 }
 
 /**

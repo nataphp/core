@@ -73,16 +73,14 @@ class Configure {
  *
  * @param string|array $config The key to write, can be a dot notation value.
  * Alternatively can be an array containing key(s) and value(s).
- * @param mixed $value Value to set for var
+ * @param mixed $value Value to set for var (ignored when $var is an array).
+ * @param bool $replace When $var is an array, replace all configuration instead of merging into existing values.
  * @return bool True if write was successful
  * @link https://book.cakephp.org/3.0/en/development/configuration.html#writing-configuration-data
  */
-    public static function write($var, $value = null) {
-        if ($value === 'auto') {
-            $value = (strtoupper(substr(PHP_OS, 0, 3)) === 'WIN');
-        }
+    public static function write($var, $value = null, $replace = false) {
         if (is_array($var)) {
-            static::$_values = $var;
+            static::$_values = $replace ? $var : Hash::merge(static::$_values, $var);
         } else {
             static::$_values = Hash::insert(static::$_values, $var, $value);
         }
@@ -113,7 +111,7 @@ class Configure {
             return static::$_values[$var] ?? $default;
         }
 
-        return Hash::get(static::$_values, $var);
+        return Hash::get(static::$_values, $var, $default);
     }
 
 /**
@@ -184,7 +182,7 @@ class Configure {
             $values = Hash::merge(static::$_values, $values);
         }
 
-        return static::write($values);
+        return static::write($values, null, true);
     }
 
 /**
@@ -234,7 +232,7 @@ class Configure {
  * Get engine instance.
  *
  * @param string $config Config name
- * @return \Nata\Core\Configure\Engine
+ * @return \Nata\Core\Configure\Engine|false
  */
     protected static function _getEngine($config) {
         if (!isset(static::$_engines[$config])) {
@@ -264,11 +262,12 @@ class Configure {
  */
     public static function config($config, $engine = null) {
         if (is_string($engine)) {
-            $config = Inflector::camelize($engine);
-            $engine = App::className($config, 'Core/Configure/Engine');
-            if (!$engine) {
-                throw new Exception(sprintf('Missing configure engine "%s"', $engine));
+            $engineClass = Inflector::camelize($engine);
+            $resolved = App::className($engineClass, 'Core/Configure/Engine');
+            if (!$resolved) {
+                throw new Exception(sprintf('Missing configure engine "%s"', $engineClass));
             }
+            $engine = $resolved;
         }
         static::$_engines[$config] = $engine;
     }
@@ -290,7 +289,7 @@ class Configure {
  * Load environment variables from a .env file into $_ENV/$_SERVER.
  *
  * This is a lightweight loader to avoid adding external dependencies.
- * The file is read only once per path.
+ * The file is read only once per path; calling loadEnv again for the same path returns true (no-op).
  *
  * Supported syntax:
  *  - KEY=value
@@ -298,13 +297,19 @@ class Configure {
  *  - KEY='value with spaces'
  *  - Lines starting with # are ignored
  *  - Leading "export " is accepted
+ *  - Unquoted values: inline comments after whitespace + # are stripped (e.g. KEY=value # note)
+ *
+ * All values are stored as strings. Cast at the read site (e.g. via env() helper).
  *
  * @param string $path Absolute path to .env file
  * @param bool $overwrite Overwrite existing variables (default false)
  * @return bool True if the file was loaded successfully, false otherwise
  */
     public static function loadEnv(string $path, bool $overwrite = false): bool {
-        if (isset(static::$_loadedEnvFiles[$path]) || !is_file($path)) {
+        if (isset(static::$_loadedEnvFiles[$path])) {
+            return true;
+        }
+        if (!is_file($path)) {
             return false;
         }
 
@@ -327,6 +332,10 @@ class Configure {
             }
             $key = trim(substr($line, 0, $pos));
             $val = trim(substr($line, $pos + 1));
+            if ($val !== '' && $val[0] !== '"' && $val[0] !== "'") {
+                $val = preg_replace('/\s+#.*$/', '', $val);
+                $val = rtrim($val);
+            }
             if ($val !== '' && ($val[0] === '"' || $val[0] === "'")) {
                 $quote = $val[0];
                 if ($val[strlen($val) - 1] === $quote) {
