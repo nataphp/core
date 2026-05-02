@@ -36,6 +36,18 @@ final class NataSmartyPlugins {
             );
         });
 
+        $smarty->registerPlugin(Smarty::PLUGIN_FUNCTION, '__d', function (array $params): string {
+            return (string) __d(
+                $params['domain'] ?? '',
+                $params['msg'] ?? '',
+                $params['args'] ?? null
+            );
+        });
+
+        $smarty->registerPlugin(Smarty::PLUGIN_MODIFIER, '__d', function (string $msg, string $domain = '', ...$formatArgs): string {
+            return (string) __d($domain, $msg, $formatArgs ?: null);
+        });
+
         $smarty->registerPlugin(Smarty::PLUGIN_FUNCTION, 'phpversion', function (): string {
             return PHP_VERSION;
         });
