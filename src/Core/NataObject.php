@@ -107,7 +107,8 @@ class NataObject implements Listener {
 
         foreach ($this->_config as $k => $v) {
             if (is_string($v) && str_starts_with($v, 'env:')) {
-                $v = getenv(substr($v, 4)) ?? null;
+                $envValue = getenv(substr($v, 4));
+                $v = $envValue !== false ? $envValue : null;
             }
             $this->_config[$k] = $v;
         }
