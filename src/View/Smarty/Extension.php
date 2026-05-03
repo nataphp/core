@@ -19,7 +19,6 @@ final class NataSmartyExtension extends Base {
         if ($tag === 'block') {
             return new NataBlockCompiler();
         }
-
         return null;
     }
 }

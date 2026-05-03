@@ -21,6 +21,7 @@ use Nata\Core\App;
 use Nata\Core\Configure;
 use Nata\I18n\I18n;
 use Nata\View\Smarty\NataSmartyExtension;
+use Nata\View\Smarty\NataSmartyPlugins;
 use Smarty\Smarty as SmartyClass;
 use Smarty\Exception as SmartyException;
 use Smarty\CompilerException as SmartyCompilerException;

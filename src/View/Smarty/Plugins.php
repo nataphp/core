@@ -6,7 +6,7 @@
  * @license   http://www.opensource.org/licenses/mit-license.php MIT License
  */
 
-namespace Nata\View;
+namespace Nata\View\Smarty;
 
 use Nata\View\CellBuilder;
 use Nata\I18n\I18n;
@@ -30,12 +30,6 @@ final class NataSmartyPlugins {
             return (string) ($formatArgs ? I18n::format($result, $formatArgs) : $result);
         });
 
-        // -- reverse: {'msg'|__r}
-        $smarty->registerPlugin(Smarty::PLUGIN_MODIFIER, '__r', function (string $msg, ...$formatArgs): string {
-            if (!$msg) return '';
-            $result = I18n::reverse($msg);
-            return (string) ($formatArgs ? I18n::format($result, $formatArgs) : $result);
-        });
 
         // -- plural: {__n singular='' plural='' count=$n} or {'singular'|__n:'plural':$count}
         $smarty->registerPlugin(Smarty::PLUGIN_FUNCTION, '__n', function (array $params): string {

@@ -15,7 +15,7 @@
  * @license       http://www.opensource.org/licenses/mit-license.php MIT License
  */
 
-namespace Nata\View;
+namespace Nata\View\Smarty;
 
 use Nata\Cache\Cache;
 use Smarty\Smarty;
@@ -29,10 +29,15 @@ use Smarty\Cacheresource\Base;
  * Stores compiled Smarty output in the Nata cache engine.
  * All cache keys are sha1-hashed to avoid collisions.
  */
-class NataCacheResource extends Base {
+class CacheResource extends Base {
 
     protected array $_config;
 
+/**
+ * Constructor.
+ *
+ *
+ */
     public function __construct(array $config) {
         $this->_config = $config;
     }

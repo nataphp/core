@@ -10,6 +10,7 @@ namespace Nata\View\Smarty;
 
 use Smarty\Compile\Tag\Block;
 use Smarty\ParseTree\Template;
+use Smarty\Compiler\Template as CompilerTemplate;
 
 /**
  * Smarty 5 only lists append/prepend as {block} option flags when blockNesting === 0.
@@ -18,11 +19,13 @@ use Smarty\ParseTree\Template;
  */
 final class NataBlockCompiler extends Block {
 
-    /**
-     * @param array $args array with attributes from parser
-     * @param array<int, mixed> $parameter array with compilation parameter
-     */
-    public function compile($args, \Smarty\Compiler\Template $compiler, $parameter = [], $tag = null, $function = null): string {
+/**
+ * Compile.
+ *
+ * @param array $args array with attributes from parser
+ * @param array<int, mixed> $parameter array with compilation parameter
+ */
+    public function compile($args, CompilerTemplate $compiler, $parameter = [], $tag = null, $function = null): string {
         if (!isset($compiler->_cache['blockNesting'])) {
             $compiler->_cache['blockNesting'] = 0;
         }
@@ -50,4 +53,5 @@ final class NataBlockCompiler extends Block {
 
         return '';
     }
+
 }

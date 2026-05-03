@@ -30,8 +30,9 @@ use Nata\Http\Response;
 use Nata\Utility\Hash;
 use Nata\Utility\Inflector;
 use Nata\I18n\I18n;
-use Nata\View\NataCacheResource;
+use Nata\View\Smarty\CacheResource as SmartyNataCacheResource;
 use Nata\View\Smarty\NataSmartyExtension;
+use Nata\View\Smarty\NataSmartyPlugins;
 use Smarty\Smarty;
 use Smarty\Exception as SmartyException;
 use Smarty\CompilerException as SmartyCompilerException;
@@ -836,7 +837,7 @@ class View extends NataObject implements Listener {
             $this->_registerNataSmartyPlugins($this->_smarty);
 
             if ($this->_cacheConfig) {
-                $this->_smarty->registerCacheResource('natacache', new NataCacheResource($this->_cacheConfig));
+                $this->_smarty->registerCacheResource('natacache', new SmartyNataCacheResource($this->_cacheConfig));
                 $this->_smarty->merge_compiled_includes = true;
                 $this->_smarty->caching_type = 'natacache';
                 $this->_smarty->setCaching(Smarty::CACHING_LIFETIME_SAVED);
