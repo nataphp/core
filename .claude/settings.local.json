@@ -1,7 +1,13 @@
 {
   "permissions": {
     "allow": [
-      "Bash(git rm *)"
+      "Bash(git rm *)",
+      "PowerShell(Get-ChildItem -Path \"c:\\\\wamp\\\\www\\\\apps\\\\proescala\\\\plugins\\\\Geography\" -Depth 0 | Select-Object Name, @{Label=\"Type\";Expression={if\\($_.PSIsContainer\\){\"DIR\"}else{\"FILE\"}}} | Format-Table -AutoSize)",
+      "PowerShell(Get-ChildItem -Path \"c:\\\\wamp\\\\www\\\\apps\\\\proescala\\\\plugins\\\\Notify\" -Depth 0 | Select-Object Name, @{Label=\"Type\";Expression={if\\($_.PSIsContainer\\){\"DIR\"}else{\"FILE\"}}} | Format-Table -AutoSize)",
+      "PowerShell(Get-ChildItem -Path \"c:/wamp/www/apps/proescala/plugins/Geography/\" -Recurse -Force | Select-Object FullName | ForEach-Object { $_.FullName } | Sort-Object)",
+      "PowerShell(Get-ChildItem -Path \"c:/wamp/www/apps/proescala/plugins/Notify/\" -Recurse -Force | Select-Object FullName | ForEach-Object { $_.FullName } | Sort-Object)",
+      "Bash(composer update *)",
+      "Bash(composer dump-autoload *)"
     ]
   }
 }

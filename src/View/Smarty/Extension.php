@@ -13,7 +13,7 @@ use Smarty\Compile\CompilerInterface;
 use Nata\View\Smarty\BlockCompiler;
 
 /**
- * Prepended before CoreExtension so {block} uses NataBlockCompiler.
+ * Prepended before CoreExtension so {block} uses BlockCompiler.
  */
 final class Extension extends Base {
 

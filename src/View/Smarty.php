@@ -567,8 +567,9 @@ class Smarty extends View {
             $this->_smarty->setCompileDir($cacheBase . 'compile' . DS);
             $this->_smarty->setCacheDir($cacheBase . 'cache' . DS);
 
+            Plugins::register($this->_smarty);
+
             if ($this->_cacheConfig) {
-                Plugins::register($this->_smarty);
                 $this->_smarty->caching_type = 'natacache';
                 $this->_smarty->inheritance_merge_compiled_includes = true;
                 $this->_smarty->setCaching(SmartyClass::CACHING_LIFETIME_SAVED);

@@ -17,7 +17,7 @@ use Smarty\Compiler\Template as CompilerTemplate;
  * Nested blocks then treat "append" as an unnamed attribute → "too many shorthand attributes".
  * Allow append/prepend at any depth (same compiled output shape as top-level blocks).
  */
-final class NataBlockCompiler extends Block {
+final class BlockCompiler extends Block {
 
 /**
  * Compile.
