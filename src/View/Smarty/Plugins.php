@@ -13,7 +13,7 @@ use Nata\I18n\I18n;
 use Smarty\Smarty;
 use Smarty\Template;
 
-final class NataSmartyPlugins {
+final class Plugins {
 
     public static function register(Smarty $smarty): void {
         // -- simple: {'msg'|__}

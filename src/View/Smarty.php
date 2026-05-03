@@ -20,8 +20,8 @@ namespace Nata\View;
 use Nata\Core\App;
 use Nata\Core\Configure;
 use Nata\I18n\I18n;
-use Nata\View\Smarty\NataSmartyExtension;
-use Nata\View\Smarty\NataSmartyPlugins;
+use Nata\View\Smarty\Extension;
+use Nata\View\Smarty\Plugins;
 use Smarty\Smarty as SmartyClass;
 use Smarty\Exception as SmartyException;
 use Smarty\CompilerException as SmartyCompilerException;
@@ -556,7 +556,7 @@ class Smarty extends View {
             $this->_smarty = new SmartyClass;
 
             $extensions = $this->_smarty->getExtensions();
-            array_unshift($extensions, new NataSmartyExtension());
+            array_unshift($extensions, new Extension());
             $this->_smarty->setExtensions($extensions);
 
             $this->_smarty->compile_check = $this->compileCheck();
@@ -568,7 +568,7 @@ class Smarty extends View {
             $this->_smarty->setCacheDir($cacheBase . 'cache' . DS);
 
             if ($this->_cacheConfig) {
-                NataSmartyPlugins::register($this->_smarty);
+                Plugins::register($this->_smarty);
                 $this->_smarty->caching_type = 'natacache';
                 $this->_smarty->inheritance_merge_compiled_includes = true;
                 $this->_smarty->setCaching(SmartyClass::CACHING_LIFETIME_SAVED);
@@ -718,9 +718,9 @@ class Smarty extends View {
     protected function _getCacheId() {
         if ($this->_cacheConfig) {
             $key = $this->_cacheConfig['key'];
-            
+
             $id = '';
-            
+
             if (strpos($key, '.') === false) {
                 $id = $this->_templatePath . '|' . $this->_basePath;
             }

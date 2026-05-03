@@ -31,8 +31,8 @@ use Nata\Utility\Hash;
 use Nata\Utility\Inflector;
 use Nata\I18n\I18n;
 use Nata\View\Smarty\CacheResource as SmartyNataCacheResource;
-use Nata\View\Smarty\NataSmartyExtension;
-use Nata\View\Smarty\NataSmartyPlugins;
+use Nata\View\Smarty\Extension;
+use Nata\View\Smarty\Plugins;
 use Smarty\Smarty;
 use Smarty\Exception as SmartyException;
 use Smarty\CompilerException as SmartyCompilerException;
@@ -811,7 +811,7 @@ class View extends NataObject implements Listener {
  * @return void
  */
     protected function _registerNataSmartyPlugins(Smarty $smarty): void {
-        NataSmartyPlugins::register($smarty);
+        Plugins::register($smarty);
     }
 
 /**
@@ -824,7 +824,7 @@ class View extends NataObject implements Listener {
             $this->_smarty = new Smarty;
 
             $extensions = $this->_smarty->getExtensions();
-            array_unshift($extensions, new NataSmartyExtension());
+            array_unshift($extensions, new Extension());
             $this->_smarty->setExtensions($extensions);
 
             $this->_smarty->compile_check = $this->compileCheck();

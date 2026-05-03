@@ -9,15 +9,23 @@
 namespace Nata\View\Smarty;
 
 use Smarty\Extension\Base;
+use Smarty\Compile\CompilerInterface;
+use Nata\View\Smarty\BlockCompiler;
 
 /**
  * Prepended before CoreExtension so {block} uses NataBlockCompiler.
  */
-final class NataSmartyExtension extends Base {
+final class Extension extends Base {
 
-    public function getTagCompiler(string $tag): ?\Smarty\Compile\CompilerInterface {
+/**
+ * Get tag compiler.
+ *
+ * @param string $tag Tag name.
+ * @return \Smarty\Compile\CompilerInterface|null
+ */
+    public function getTagCompiler(string $tag): ?CompilerInterface {
         if ($tag === 'block') {
-            return new NataBlockCompiler();
+            return new BlockCompiler();
         }
         return null;
     }
