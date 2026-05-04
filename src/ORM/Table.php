@@ -36,12 +36,12 @@ use Nata\Database\Connection;
 use Nata\Database\Schema;
 use TableException;
 use Throwable;
-use Exception;
 use MissingEntityException;
 use LogicException;
 use InvalidArgumentException;
 use InvalidPrimaryKeyException;
 use BadMethodCallException;
+use RuntimeException;
 
 /**
  * Table's CRUD controls with associational control, SQL builder
@@ -453,6 +453,13 @@ class Table extends NataObject implements Listener {
 
             if (is_string($this->_connection)) {
                 $this->_connection = ConnectionManager::get($this->_connection);
+            }
+
+            if ($this->_connection === null) {
+                throw new RuntimeException(sprintf(
+                    'Table "%s" has no database connection configured. Check that the DB_CONFIG environment variable is set.',
+                    $this->table()
+                ));
             }
 
             return $this->_connection;
