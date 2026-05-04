@@ -94,7 +94,6 @@ trait ConfigAwareTrait {
         }
 
         if (is_string($name) && $value !== null) {
-            $value = $this->_resolveEnvValue($value);
             $this->_config = Hash::insert($this->_config, $name, $value);
             return $this;
         }
@@ -109,7 +108,6 @@ trait ConfigAwareTrait {
             }
         }
 
-        $name = $this->_resolveEnvInConfig($name);
         $this->_config = $merge ?
             array_merge($this->_config, $name) :
             array_merge($this->_getDefaultConfig(), $name);
@@ -138,7 +136,7 @@ trait ConfigAwareTrait {
             throw new BadMethodCallException("Context name 'default' is reserved.");
         }
 
-        $this->_configContexts[$contextName] = $this->_resolveEnvInConfig(array_merge($default, $config));
+        $this->_configContexts[$contextName] = array_merge($default, $config);
 
         if ($this->_config === []) {
             $this->switchContext('default');
@@ -156,7 +154,7 @@ trait ConfigAwareTrait {
  */
     final public function switchContext(string $contextName): self {
         if (!isset($this->_configContexts[$contextName])) {
-            $this->_configContexts[$contextName] = $this->_resolveEnvInConfig($this->_getDefaultConfig());
+            $this->_configContexts[$contextName] = $this->_getDefaultConfig();
         }
 
         $this->_context = $contextName;
@@ -189,34 +187,6 @@ trait ConfigAwareTrait {
             $default = $this->_defaultConfig;
         }
         return $default;
-    }
-
-/**
- * Resolve a single value: if string "env:NAME", return getenv("NAME").
- *
- * @param mixed $value
- * @return mixed
- */
-    private function _resolveEnvValue(mixed $value): mixed {
-        if (is_string($value) && str_starts_with($value, 'env:')) {
-            $env = getenv(substr($value, 4));
-            return $env !== false ? $env : $value;
-        }
-        return $value;
-    }
-
-/**
- * Recursively resolve "env:NAME" string values in a config array.
- *
- * @param array $config
- * @return array
- */
-    private function _resolveEnvInConfig(array $config): array {
-        $out = [];
-        foreach ($config as $k => $v) {
-            $out[$k] = is_array($v) ? $this->_resolveEnvInConfig($v) : $this->_resolveEnvValue($v);
-        }
-        return $out;
     }
 
 }

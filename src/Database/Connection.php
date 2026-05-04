@@ -87,8 +87,6 @@ class Connection {
             'charset' => str_replace('-', '', Configure::read('App.encoding'))
         ];
 
-        $config = $this->_resolveEnvInConfig($config);
-
         $this->_doctrineConnection = DriverManager::getConnection($config, $configuration);
         $this->_configName = $config['_configName'];
 
@@ -177,23 +175,6 @@ class Connection {
  */
     public function __call($name, $args): mixed {
         return $this->_doctrineConnection->{$name}(...$args);
-    }
-
-/**
- * Resolve environment variables in a config array.
- *
- * @param array $config
- * @return array
- */
-    private function _resolveEnvInConfig(array $config): array {
-        $out = [];
-        foreach ($config as $k => $v) {
-            if (is_string($v) && str_starts_with($v, 'env:')) {
-                $v = getenv(substr($v, 4));
-            }
-            $out[$k] = $v;
-        }
-        return $out;
     }
 
 }

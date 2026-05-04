@@ -79,13 +79,13 @@ class BaseApplication extends NataObject implements MiddlewareInterface {
             'timezone' => 'UTC'
         ]);
 
+        include $this->_configDir . 'bootstrap.inc.php';
+
         include $this->_configDir . 'core.inc.php';
 
         if (file_exists($this->_configDir . 'database.inc.php')) {
             include $this->_configDir . 'database.inc.php';
         }
-
-        include $this->_configDir . 'bootstrap.inc.php';
 
         // Improve PHP configuration to prevent issues
         ini_set('upload_max_filesize', '100M');

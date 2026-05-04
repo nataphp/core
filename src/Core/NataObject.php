@@ -105,16 +105,6 @@ class NataObject implements Listener {
             $this->_config = Hash::insert($this->_config, $varName, $value);
         }
 
-        foreach ($this->_config as $k => $v) {
-            if (is_string($v) && str_starts_with($v, 'env:')) {
-                $envVarName = substr($v, 4);
-                $envValue = getenv($envVarName);
-                $this->_config[$k] = $envValue !== false ? $envValue : null;
-            } else {
-                $this->_config[$k] = $v;
-            }
-        }
-
         return $this;
     }
 
