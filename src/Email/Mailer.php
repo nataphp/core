@@ -86,11 +86,11 @@ class Mailer implements JsonSerializable {
     protected $_viewVars = [];
 
 /**
- * Template path.
+ * Delivery channel — routes to templates/{channel}/ root.
  *
  * @var string
  */
-    protected $_templatePath = 'Email';
+    protected $_channel = 'email';
 
 /**
  * Error information.
@@ -322,8 +322,8 @@ class Mailer implements JsonSerializable {
 
         $View = $this->viewBuilder();
 
-        if ($this->_templatePath) {
-            $View->templatePath($this->_templatePath);
+        if ($this->_channel) {
+            $View->channel($this->_channel);
         }
 
         if ($type) {
@@ -446,7 +446,7 @@ class Mailer implements JsonSerializable {
 
         $View = ViewBuilder::build();
         $View->set($this->_viewVars)
-            ->templatePath($this->_templatePath)
+            ->channel($this->_channel)
             ->compileCheck($debug)
             ->forceCompile($debug);
 

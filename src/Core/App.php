@@ -164,6 +164,16 @@ class App {
                 return $root . 'src' . DS . 'Template' . DS . $rest;
             }
 
+            if (($package === 'Template' || strpos($package, 'Template' . DS) === 0)
+                && is_dir($root . 'templates')
+            ) {
+                $rest = strpos($package, 'Template' . DS) === 0
+                    ? substr($package, strlen('Template' . DS))
+                    : '';
+
+                return $root . 'templates' . DS . $rest;
+            }
+
             return $root . $package;
         }
 

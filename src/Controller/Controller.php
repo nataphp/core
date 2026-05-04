@@ -228,12 +228,13 @@ class Controller extends NataObject implements Listener {
                 )
                 ->plugin($this->plugin)
                 ->loadHelpers($this->helpers)
-                ->templatePath($this->name)
+                ->channel('http')
+                ->folder($this->name)
                 ->template(Inflector::underscore($this->request->action))
                 ->layout('layout');
 
             if ($prefix = $this->request->prefix) {
-                $view->basePath(Inflector::camelize($prefix));
+                $view->prefix(Inflector::camelize($prefix));
             }
 
             // htmx: return only the template fragment (no layout) when request sends HX-Request header
@@ -450,7 +451,6 @@ class Controller extends NataObject implements Listener {
         } catch (ReflectionException $e) {
             $this->_throwMissingAction($action);
         }
-
     }
 
 /**

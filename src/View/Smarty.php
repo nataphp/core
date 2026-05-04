@@ -36,18 +36,25 @@ use RunTimeException;
 class Smarty extends View {
 
 /**
- * Template base path.
+ * Template channel (e.g. 'http', 'email', 'notifications').
  *
- * @var string
+ * @var string|null
  */
-    protected $_basePath;
+    protected $_channel = null;
 
 /**
- * Template path.
+ * Template prefix (section — e.g. 'Admin', 'Staff').
  *
  * @var string
  */
-    protected $_templatePath;
+    protected $_prefix;
+
+/**
+ * Template folder (controller-level subdirectory override).
+ *
+ * @var string
+ */
+    protected $_folder;
 
 /**
  * View template name.
@@ -162,32 +169,55 @@ class Smarty extends View {
 
 
 /**
- * Set/Get template base path.
- * Base path is applied before the theme and/or template path.
+ * Set/Get the delivery channel ('http', 'email', 'notifications').
  *
- * @param string $basePath Prefix.
- * @return string|$this
+ * @param string|null $channel Channel name.
+ * @return string|null|$this
  */
-    public function basePath($basePath = null) {
+    public function channel($channel = null) {
         if (func_num_args() === 0) {
-            return $this->_basePath;
+            return $this->_channel;
         }
-        $this->_basePath = $basePath;
+        $this->_channel = $channel;
         return $this;
     }
 
 /**
- * Set/Get template path.
+ * Set/Get template prefix (section — e.g. 'Admin', 'Staff').
  *
- * @param string $templatePath View path.
+ * @param string $prefix Section prefix.
  * @return string|$this
  */
-    public function templatePath($templatePath = null) {
+    public function prefix($prefix = null) {
         if (func_num_args() === 0) {
-            return $this->_templatePath;
+            return $this->_prefix;
         }
-        $this->_templatePath = $templatePath;
+        $this->_prefix = $prefix;
         return $this;
+    }
+
+/** @deprecated Use prefix() */
+    public function basePath($basePath = null) {
+        return func_num_args() === 0 ? $this->prefix() : $this->prefix($basePath);
+    }
+
+/**
+ * Set/Get template folder (controller-level subdirectory).
+ *
+ * @param string $folder Folder name.
+ * @return string|$this
+ */
+    public function folder($folder = null) {
+        if (func_num_args() === 0) {
+            return $this->_folder;
+        }
+        $this->_folder = $folder;
+        return $this;
+    }
+
+/** @deprecated Use folder() */
+    public function templatePath($templatePath = null) {
+        return func_num_args() === 0 ? $this->folder() : $this->folder($templatePath);
     }
 
 /**
@@ -314,8 +344,8 @@ class Smarty extends View {
         }
 
         $paths = array();
-        $path = $this->_templatePath;
-        $theme = $basePath = '';
+        $path = $this->_folder;
+        $theme = $channel = $basePath = '';
 
         // Template path
         list($plugin, $_template) = pluginSplit($template);
@@ -340,8 +370,12 @@ class Smarty extends View {
             }
         }
 
-        if ($this->_basePath) {
-            $basePath = DS . $this->_basePath;
+        if ($this->_channel) {
+            $channel = DS . $this->_channel;
+        }
+
+        if ($this->_prefix) {
+            $basePath = DS . $this->_prefix;
         }
 
         if ($this->_themed) {
@@ -349,19 +383,19 @@ class Smarty extends View {
         }
 
         // Avoid redo/reset paths
-        $_pathKey = $plugin . $basePath . $theme . $path;
+        $_pathKey = $plugin . $channel . $basePath . $theme . $path;
         if (isset($this->_paths[$_pathKey])) {
             return $this->_paths[$_pathKey];
         }
 
         // Plugin
         if ($plugin) {
-            $absolutePath = App::path('Template' . $basePath . $theme . $path, $plugin);
+            $absolutePath = App::path('Template' . $channel . $basePath . $theme . $path, $plugin);
             $paths = $this->_parentPaths($absolutePath, $paths);
         }
 
         // App
-        $absolutePath = App::path('Template' . $basePath . $theme . $path);
+        $absolutePath = App::path('Template' . $channel . $basePath . $theme . $path);
         $paths = $this->_parentPaths($absolutePath, $paths);
 
         // Nata
@@ -382,7 +416,11 @@ class Smarty extends View {
     protected function _parentPaths($deepPath, array $paths) {
         $paths[] = $deepPath;
         $exploded = explode(DS, $deepPath);
-        $index = (array_search('Template', $exploded) + 1);
+        $key = array_search('templates', $exploded);
+        if ($key === false) {
+            $key = array_search('Template', $exploded);
+        }
+        $index = ($key !== false ? $key : count($exploded) - 1) + 1;
         for ($int = count($exploded); $int > $index; $int--) {
             $deepPath = $paths[] = dirname($deepPath);
         }
