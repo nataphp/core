@@ -21,7 +21,7 @@ declare(strict_types=1);
  * of metadata within a PNG format image.
  */
 
-namespace Nata\Filesystem\File\Image\Exif;
+namespace Nata\FilesystemManager\File\Image\Exif;
 
 use ArrayObject;
 
