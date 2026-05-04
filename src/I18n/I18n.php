@@ -926,7 +926,7 @@ class I18n {
                 foreach ($plugins as $plugin) {
                     $pluginDomain = Inflector::underscore($plugin);
                     if ($pluginDomain === $domain) {
-                        $pluginLocalePath = Plugin::path($plugin) . 'Locale' . DS;
+                        $pluginLocalePath = Plugin::path($plugin) . 'resources' . DS . 'locales' . DS;
                         break;
                     }
                 }
