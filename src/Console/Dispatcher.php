@@ -17,7 +17,9 @@
 
 namespace Nata\Console;
 
+use Nata\Cache\Cache;
 use Nata\Core\App;
+use Nata\Core\ComposerPlugins;
 use Nata\Core\Configure;
 use MissingJobMethodException;
 use Nata\Console\ErrorHandler;
@@ -124,6 +126,8 @@ class Dispatcher {
     protected function _bootstrap() {
         $configDir = is_dir(ROOT . 'config') ? ROOT . 'config' . DS : App::path('Config/');
 
+        Configure::loadEnv(ROOT . '.env');
+
         Configure::write('App', [
             'base' => false,
             'baseUrl' => false,
@@ -132,20 +136,50 @@ class Dispatcher {
             'themed' => false,
             'encoding' => 'UTF-8',
             'timezone' => 'UTC',
-            'maintenance' => false
         ]);
 
-        include $configDir . 'core.inc.php';
+        Configure::write('debug', false);
+        Configure::write('development', false);
+        Configure::write('Cache', ['disabled' => false]);
+        Configure::write('maintenance', [
+            'enabled' => false,
+            'level' => 1,
+            'description' => null,
+            'until' => null,
+            'allowedIp' => [],
+        ]);
+        Configure::write('Error', [
+            'handler' => '\Nata\Error\Handler::handleError',
+            'cronHandler' => '\Nata\Cron\ErrorHandler::handleError',
+            'level' => E_ALL & ~E_DEPRECATED,
+            'trace' => true
+        ]);
+        Configure::write('Exception', [
+            'handler' => '\Nata\Error\Handler::handleException',
+            'cronHandler' => '\Nata\Cron\ErrorHandler::handleError',
+            'renderer' => '\Nata\Error\Renderer',
+            'log' => true,
+            'skipLog' => ['NotFoundException', 'UnderMaintenanceException']
+        ]);
+
+        Cache::config('__nata_core__', [
+            'engine' => ['Apc', 'File'],
+            'duration' => '10 days'
+        ]);
+
+        if (is_file($configDir . 'local.inc.php')) {
+            include $configDir . 'local.inc.php';
+        }
+
+        include $configDir . 'bootstrap.inc.php';
 
         if (file_exists($configDir . 'database.inc.php')) {
             include $configDir . 'database.inc.php';
         }
 
-        include $configDir . 'bootstrap.inc.php';
+        ComposerPlugins::load();
 
-        // Improve PHP configuration to prevent issues
         ini_set('upload_max_filesize', '100M');
-
         date_default_timezone_set(Configure::read('App.timezone'));
 
         if (function_exists('mb_internal_encoding')) {
