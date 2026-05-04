@@ -823,15 +823,25 @@ class View extends NataObject implements Listener {
         $exceptionName = 'MissingTemplateException';
         $message = $exception->getMessage();
 
-        $_message = array(
+        $templateFile = $this->_normalizeTemplate($this->_template);
+        $defaultPath = isset($paths[0]) ? $paths[0] : null;
+        $expectedFullPath = $defaultPath && $templateFile ? rtrim($defaultPath, DIRECTORY_SEPARATOR) . DIRECTORY_SEPARATOR . $templateFile : null;
+
+        $_message = [
+            'message' => sprintf(
+                'Template file "%s" is missing.%s%s',
+                $this->_template,
+                $templateFile ? ' Expected file: ' . $templateFile . '.' : '',
+                $expectedFullPath ? ' Expected path: ' . $expectedFullPath . '.' : ($defaultPath ? ' Search path: ' . $defaultPath . '.' : '')
+            ),
             'template' => $this->_template,
             'layout' => $this->_layout,
             'plugin' => $this->_plugin,
             'paths' => $paths,
             'template_path' => $this->_folder,
-            'template_file' => $this->_normalizeTemplate($this->_template),
-            'defaultpath' => (isset($paths[0]) ? $paths[0] : null),
-        );
+            'template_file' => $templateFile,
+            'defaultpath' => $defaultPath,
+        ];
 
         if ((strpos($message, 'Unable to load') === false && strpos($message, 'extends') === false) || $exception instanceof SmartyCompilerException) {
             $exceptionName = 'TemplateCompilerException';

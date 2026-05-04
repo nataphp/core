@@ -250,6 +250,13 @@ class App {
  * @return string Full path
  */
     public static function core($package) {
+        $coreRoot = dirname(dirname(__DIR__));
+        if ($package === 'Template' || strpos($package, 'Template' . DS) === 0) {
+            $rest = $package === 'Template'
+                ? ''
+                : substr($package, strlen('Template' . DS));
+            return $coreRoot . DS . 'templates' . DS . static::ds($rest);
+        }
         return dirname(__DIR__) . DS . static::ds($package);
     }
 
