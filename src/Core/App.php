@@ -141,6 +141,10 @@ class App {
  *  App::path('Controller', 'MyPlugin');
  *  /absolute/path/to/plugins/MyPlugin/Controller/
  *
+ *  App::path('Template', 'MyPlugin');
+ *  If plugins/MyPlugin/src/Template exists: .../plugins/MyPlugin/src/Template/
+ *  Otherwise: .../plugins/MyPlugin/Template/ (legacy layout)
+ *
  * @param string $relative App folder relative path
  * @param string $plugin Plugin name if is inside plugin
  * @return string Full path
@@ -149,7 +153,18 @@ class App {
         $package = static::ds(ltrim($package, '/'));
 
         if (!empty($plugin)) {
-            return static::pluginPath($plugin . DS) . $package;
+            $root = static::pluginPath($plugin . DS);
+            if (($package === 'Template' || strpos($package, 'Template' . DS) === 0)
+                && is_dir($root . 'src' . DS . 'Template')
+            ) {
+                $rest = strpos($package, 'Template' . DS) === 0
+                    ? substr($package, strlen('Template' . DS))
+                    : '';
+
+                return $root . 'src' . DS . 'Template' . DS . $rest;
+            }
+
+            return $root . $package;
         }
 
         if ($package === 'public' || strpos($package, 'public' . DS) === 0) {
