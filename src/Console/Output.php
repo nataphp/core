@@ -166,13 +166,16 @@ class Output {
     public function __construct(string $stream = 'php://stdout') {
         $this->_output = fopen($stream, 'wb');
 
+        $winUname = strtolower(php_uname('v'));
         if (
             (
                 DIRECTORY_SEPARATOR === '\\' &&
-                strpos(strtolower(php_uname('v')), 'windows 10') === false &&
+                strpos($winUname, 'windows 10') === false &&
+                strpos($winUname, 'windows 11') === false &&
                 strpos(strtolower((string)env('SHELL')), 'bash.exe') === false &&
                 !(bool)env('ANSICON') &&
-                env('ConEmuANSI') !== 'ON'
+                env('ConEmuANSI') !== 'ON' &&
+                env('WT_SESSION') === null
             ) ||
             (
                 function_exists('posix_isatty') &&
