@@ -17,7 +17,9 @@
 
 namespace Nata\Http;
 
+use Nata\Cache\Cache;
 use Nata\Console\CommandCollection;
+use Nata\Core\ComposerPlugins;
 use Nata\Core\App;
 use Nata\Core\Configure;
 use Nata\Core\NataObject;
@@ -69,6 +71,11 @@ class BaseApplication extends NataObject implements MiddlewareInterface {
  * @return void
  */
     public function bootstrap() {
+        // Load environment variables from the root .env file into Configure
+        Configure::loadEnv(ROOT . '.env');
+
+        // Core application paths and locale settings; base/baseUrl are false so
+        // the framework auto-detects them from the request
         Configure::write('App', [
             'base' => false,
             'baseUrl' => false,
@@ -79,15 +86,59 @@ class BaseApplication extends NataObject implements MiddlewareInterface {
             'timezone' => 'UTC'
         ]);
 
-        include $this->_configDir . 'bootstrap.inc.php';
+        // Safe production defaults — individual apps override these as needed
+        Configure::write('debug', false);       // disable verbose error output
+        Configure::write('development', false); // disable development-only features
+        Configure::write('Cache', ['disabled' => false]); // ensure caching is active
 
-        include $this->_configDir . 'core.inc.php';
+        // Maintenance mode defaults; apps raise 'enabled' and set a message/until
+        // date when they need to take the site offline temporarily
+        Configure::write('maintenance', [
+            'enabled' => false,
+            'level' => 1,       // 1 = full lock-out, higher levels may allow partial access
+            'description' => null,
+            'until' => null,    // expected end time shown to visitors
+            'allowedIp' => [],  // IPs that bypass the maintenance gate
+        ]);
+
+        // PHP error handling — routes errors to the Nata handler which formats
+        // and logs them; cron jobs use a dedicated handler to avoid HTTP responses
+        Configure::write('Error', [
+            'handler' => '\Nata\Error\Handler::handleError',
+            'cronHandler' => '\Nata\Cron\ErrorHandler::handleError',
+            'level' => E_ALL & ~E_DEPRECATED, // capture everything except deprecation notices
+            'trace' => true
+        ]);
+
+        // Uncaught exception handling — renders a clean error page and logs the
+        // exception; expected user-facing exceptions are excluded from the log
+        Configure::write('Exception', [
+            'handler' => '\Nata\Error\Handler::handleException',
+            'cronHandler' => '\Nata\Cron\ErrorHandler::handleError',
+            'renderer' => '\Nata\Error\Renderer',
+            'log' => true,
+            'skipLog' => ['NotFoundException', 'UnderMaintenanceException']
+        ]);
+
+        // Internal framework cache used by the core itself (e.g. plugin discovery);
+        // prefers APC for speed and falls back to file-based caching
+        Cache::config('__nata_core__', [
+            'engine' => ['Apc', 'File'],
+            'duration' => '10 days'
+        ]);
+
+        if (is_file($this->_configDir . 'local.inc.php')) {
+            include $this->_configDir . 'local.inc.php';
+        }
+
+        include $this->_configDir . 'bootstrap.inc.php';
 
         if (file_exists($this->_configDir . 'database.inc.php')) {
             include $this->_configDir . 'database.inc.php';
         }
 
-        // Improve PHP configuration to prevent issues
+        ComposerPlugins::load();
+
         ini_set('upload_max_filesize', '100M');
         date_default_timezone_set(Configure::read('App.timezone'));
         if (function_exists('mb_internal_encoding')) {

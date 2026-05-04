@@ -20,7 +20,7 @@ use Nata\Console\Arguments;
 use Nata\Console\Command;
 use Nata\Console\Io;
 use Nata\Console\OptionParser;
-use Nata\Core\App;
+use Nata\Core\ComposerPlugins;
 use Nata\Core\Plugin;
 use Nata\Utility\Inflector;
 
@@ -57,28 +57,38 @@ class ListPlugins extends Command {
  */
     public function execute(Arguments $args, Io $io): ?int {
         $plugins = Plugin::list();
-        $pluginPath = ROOT . 'public' . DS . 'plugin' . DS;
+        $pluginWebroot = ROOT . 'public' . DS . 'plugin' . DS;
+
+        $composerMap = [];
+        foreach (ComposerPlugins::getPlugins() as $descriptor) {
+            $composerMap[$descriptor['name']] = $descriptor['package'];
+        }
 
         $io->info('Available plugins:', 2);
 
         foreach ($plugins as $plugin) {
             $disabled = strpos($plugin, '.disabled') !== false;
             $name = $disabled ? preg_replace('/\.disabled$/', '', $plugin) : $plugin;
-            $publicDir = $pluginPath . Inflector::dasherize($name);
-            $installed = is_dir($publicDir);
-            $line = '  ' . $name;
+            $assetsInstalled = is_dir($pluginWebroot . Inflector::dasherize($name));
+
+            $source = isset($composerMap[$name])
+                ? '[composer: ' . $composerMap[$name] . ']'
+                : '[local]';
+
+            $line = '  ' . $name . '  ' . $source;
             if ($disabled) {
-                $line .= ' <comment>(disabled)</comment>';
+                $io->warning($line . '  (disabled)');
+            } elseif ($assetsInstalled) {
+                $io->success($line . '  [assets installed]');
+            } else {
+                $io->out($line);
             }
-            if ($installed) {
-                $line .= ' <success>[installed]</success>';
-            }
-            $io->out($line);
         }
 
         $io->out('');
         $io->hr(1);
         $io->comment('Use "nata plugin install <name>" to install a plugin.');
+        $io->comment('Use "nata plugin install vendor/package" for third-party plugins.');
 
         return Command::CODE_SUCCESS;
     }

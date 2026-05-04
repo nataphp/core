@@ -20,14 +20,17 @@ use Nata\Console\Arguments;
 use Nata\Console\Command;
 use Nata\Console\Io;
 use Nata\Console\OptionParser;
-use Nata\Core\App;
+use Nata\Core\ComposerPlugins;
 use Nata\Core\Plugin;
 use Nata\Utility\Inflector;
 
 /**
  * Plugin install subcommand: copy public files and run schema.
+ * Also handles composer require for Composer-distributed plugins.
  */
 class Install extends Command {
+
+    use PluginCommandTrait;
 
 /**
  * Command description.
@@ -46,20 +49,25 @@ class Install extends Command {
         $optionParser->setDescription('Install a plugin: copy public files to public/plugin/ and run schema SQL.')
             ->addArgument('plugin', [
                 'required' => true,
-                'help' => 'Plugin name (e.g. Menus, Acl)'
+                'help' => 'Plugin name (e.g. Notify) or package (e.g. acme/payments).'
+            ])
+            ->addOption('no-composer', [
+                'help' => 'Skip running "composer require" (use when package is already downloaded).',
+                'boolean' => true,
+                'default' => false
             ])
             ->addOption('composer-path', [
                 'short' => 'c',
-                'help' => 'Path when installed via Composer (e.g. vendor/maismls/menus)',
+                'help' => 'Path override for Composer-installed plugin (e.g. vendor/nataphp/notify).',
                 'default' => null
             ])
             ->addOption('skip-schema', [
-                'help' => 'Skip running schema SQL',
+                'help' => 'Skip running schema SQL.',
                 'boolean' => true,
                 'default' => false
             ])
             ->addOption('skip-assets', [
-                'help' => 'Skip copying public files',
+                'help' => 'Skip copying public files.',
                 'boolean' => true,
                 'default' => false
             ]);
@@ -75,10 +83,41 @@ class Install extends Command {
  * @return int|null Exit code
  */
     public function execute(Arguments $args, Io $io): ?int {
-        $plugin = Inflector::camelize($args->getArgument('plugin'));
+        $input = $args->getArgument('plugin');
+        $noComposer = $args->getOption('no-composer') === true;
         $composerPath = $args->getOption('composer-path');
         $skipSchema = $args->getOption('skip-schema') === true;
         $skipAssets = $args->getOption('skip-assets') === true;
+
+        // Determine whether this is a local or Composer plugin
+        $localPlugin = Inflector::camelize($input);
+        $isLocal = strpos($input, '/') === false
+            && is_dir(ROOT . 'plugins' . DS . $localPlugin . DS);
+
+        if ($isLocal) {
+            $plugin = $localPlugin;
+        } else {
+            // Composer-based install
+            $packageName = $this->_resolvePackageName($input);
+
+            if (!$noComposer && !$this->_isComposerInstalled($packageName)) {
+                $io->info(sprintf('Package "%s" not installed. Running composer require...', $packageName), 2);
+                if (!$this->_runComposer('require', $packageName, $io)) {
+                    $io->error('composer require failed. Aborting.');
+                    return Command::CODE_ERROR;
+                }
+            }
+
+            $plugin = ComposerPlugins::derivePluginName($packageName);
+
+            if ($composerPath === null) {
+                $composerPath = $this->_findComposerPath($packageName);
+                if ($composerPath === null) {
+                    $io->error(sprintf('Could not locate installed package "%s" in vendor/.', $packageName));
+                    return Command::CODE_ERROR;
+                }
+            }
+        }
 
         $sourcePath = Plugin::getPluginSourcePath($plugin, $composerPath);
         if (!is_dir($sourcePath)) {

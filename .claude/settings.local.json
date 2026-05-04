@@ -7,7 +7,10 @@
       "PowerShell(Get-ChildItem -Path \"c:/wamp/www/apps/proescala/plugins/Geography/\" -Recurse -Force | Select-Object FullName | ForEach-Object { $_.FullName } | Sort-Object)",
       "PowerShell(Get-ChildItem -Path \"c:/wamp/www/apps/proescala/plugins/Notify/\" -Recurse -Force | Select-Object FullName | ForEach-Object { $_.FullName } | Sort-Object)",
       "Bash(composer update *)",
-      "Bash(composer dump-autoload *)"
+      "Bash(composer dump-autoload *)",
+      "PowerShell(head -20)",
+      "Bash(Get-ChildItem -Path \"c:\\\\wamp\\\\www\\\\apps\\\\proescala\\\\plugins\\\\Geography\\\\\" -File -Name | head -20)",
+      "PowerShell(Test-Path \"c:\\\\wamp\\\\www\\\\apps\\\\proescala\\\\plugins\\\\Geography\\\\plugin.json\" ; dir \"c:\\\\wamp\\\\www\\\\apps\\\\proescala\\\\plugins\\\\Geography\\\\\" | where {$_.PSIsContainer -eq $false})"
     ]
   }
 }
