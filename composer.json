@@ -33,10 +33,10 @@
     },
     "scripts": {
         "post-install-cmd": [
-            "@php scripts/sync-nata-assets.php"
+            "@php vendor/nataphp/core/scripts/sync-nata-assets.php"
         ],
         "post-update-cmd": [
-            "@php scripts/sync-nata-assets.php"
+            "@php vendor/nataphp/core/scripts/sync-nata-assets.php"
         ]
     },
     "config": {
