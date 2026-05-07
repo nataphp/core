@@ -195,7 +195,7 @@ abstract class Cell extends NataObject implements Listener {
                 ->themed($this->theme ? true : false)
                 ->theme($this->theme)
                 ->plugin($this->plugin)
-                ->basePath('Cell');
+                ->channel('cells');
         }
 
         return $this->View;
