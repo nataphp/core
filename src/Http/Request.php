@@ -293,12 +293,48 @@ class Request implements ArrayAccess {
  */
     protected function _restructureFileData(array $data) {
         foreach ($data as $key => $fileParams) {
+            if (!is_array($fileParams)) {
+                continue;
+            }
+            $fileParams = $this->_normalizePhpSingleFileUploadFields($fileParams);
             $_data = [];
             foreach ($fileParams as $name => $files) {
                 $_data = Hash::merge($_data, $this->_fileData($files, $name));
             }
             $this->_data[$key] = $_data;
         }
+    }
+
+/**
+ * PHP single-file uploads expose scalar strings for name/type/tmp_name/error/size.
+ * _fileData() expects list-shaped values (like multi-file uploads). Wrap scalars.
+ *
+ * @param array<string, mixed> $fileParams One $_FILES bucket (e.g. $_FILES['file']).
+ * @return array<string, mixed>
+ */
+    protected function _normalizePhpSingleFileUploadFields(array $fileParams): array
+    {
+        if (!isset($fileParams['name'], $fileParams['tmp_name'])) {
+            return $fileParams;
+        }
+        if (is_array($fileParams['name'])) {
+            return $fileParams;
+        }
+
+        $attrs = ['name', 'type', 'tmp_name', 'error', 'size'];
+        if (\PHP_VERSION_ID >= 80100) {
+            $attrs[] = 'full_path';
+        }
+        foreach ($attrs as $attr) {
+            if (!\array_key_exists($attr, $fileParams)) {
+                continue;
+            }
+            if (!\is_array($fileParams[$attr])) {
+                $fileParams[$attr] = [$fileParams[$attr]];
+            }
+        }
+
+        return $fileParams;
     }
 
 /**
