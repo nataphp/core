@@ -145,6 +145,9 @@ class App {
  *  If plugins/MyPlugin/src/Template exists: .../plugins/MyPlugin/src/Template/
  *  Otherwise: .../plugins/MyPlugin/Template/ (legacy layout)
  *
+ *  App::path('resources');
+ *  /absolute/path/to/resources/
+ *
  * @param string $relative App folder relative path
  * @param string $plugin Plugin name if is inside plugin
  * @return string Full path
@@ -179,6 +182,14 @@ class App {
 
         if ($package === 'public' || strpos($package, 'public' . DS) === 0) {
             return ROOT . rtrim($package, DS) . DS;
+        }
+
+        if ($package === 'resources' || strpos($package, 'resources' . DS) === 0) {
+            $rest = ($package === 'resources' || $package === 'resources' . DS)
+                ? ''
+                : substr($package, strlen('resources' . DS));
+
+            return ROOT . 'resources' . DS . $rest;
         }
 
         if ($package === 'Config' || strpos($package, 'Config' . DS) === 0) {
