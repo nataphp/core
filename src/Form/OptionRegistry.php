@@ -68,6 +68,11 @@ class OptionRegistry implements JsonSerializable {
     public function loadAll(mixed $options) {
         $isArrayList = array_is_list($options);
         foreach ($options as $value => $config) {
+            if (str_contains($value, '@value')) {
+                unset($options[$value]);
+                continue;
+            }
+
             if (is_string($value) && is_array($config) && $this->_isGroupConfig($config)) {
                 $this->loadGroup($value, $config);
                 continue;
@@ -280,10 +285,9 @@ class OptionRegistry implements JsonSerializable {
     }
 
 /**
- * Append to field ID.
+ * Generate a unique ID for the option.
  *
- * @param string $append String to append to current id
- * @return string Field name
+ * @return string
  */
     protected function _autoId() {
         return implode('-', $this->_element->id()) . '-' . $this->count();
