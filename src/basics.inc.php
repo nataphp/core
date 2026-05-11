@@ -70,7 +70,7 @@ function gentime($profileName = 'App', $print = true, $clear = true, $precision 
 /**
  * Simple debug using print_r.
  *
- * @param mixed $array The array to print
+ * @param mixed $data The array to print
  * @param boolean $print True to print the result, false to return it
  * @return string|void
  */

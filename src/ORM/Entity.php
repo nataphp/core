@@ -696,9 +696,20 @@ class Entity extends NataObject implements JsonSerializable, ArrayAccess {
  * This method will recursively transform entities assigned to properties
  * into arrays as well.
  *
+ * If a circular reference is detected, the result will
+ * contain a '__circular_ref__' key with the value '[Circular: <class>#<id>]'.
+ *
  * @return array
  */
     public function toArray(): array {
+        static $infiniteLoopGuard = [];
+
+        $selfId = spl_object_id($this);
+        if (isset($infiniteLoopGuard[$selfId])) {
+            return ['__circular_ref__' => sprintf('[Circular: %s#%s]', $this->source() ?? get_class($this), $this->get('id') ?? $selfId)];
+        }
+        $infiniteLoopGuard[$selfId] = true;
+
         $result = [];
         foreach ($this->visibleProperties() as $property) {
             $value = $this->get($property);
@@ -719,6 +730,9 @@ class Entity extends NataObject implements JsonSerializable, ArrayAccess {
                 $result[$property] = $value;
             }
         }
+
+        unset($infiniteLoopGuard[$selfId]);
+
         return $result;
     }
 
