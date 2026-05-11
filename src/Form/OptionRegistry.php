@@ -67,7 +67,7 @@ class OptionRegistry implements JsonSerializable {
  */
     public function loadAll(mixed $options) {
         $valueAsKey = self::valueAsKey();
-        $isArrayList = array_is_list($options);
+        $isArrayList = is_array(reset($options)) && array_is_list($options);
         foreach ($options as $value => $config) {
             if (str_contains($value, '@valueAsKey')) {
                 self::valueAsKey($config);
