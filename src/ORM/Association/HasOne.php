@@ -136,7 +136,7 @@ class HasOne extends Association {
         $target = $this->target();
         $source = $this->source();
 
-        if ($targetEntity === null) {
+        if (empty($targetEntity)) {
             $this->_deleteTargetEntity($sourceEntity);
             return $targetEntity;
         }
