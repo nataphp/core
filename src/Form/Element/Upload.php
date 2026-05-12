@@ -1247,7 +1247,7 @@ class Upload extends Element {
                 $this->error(__('Invalid file path.'));
                 return null;
             }
-            if (!str_starts_with($path, 'uploads/tmp/')) {
+            if (!str_starts_with($path, 'uploads/tmp/') && empty($posted['id'])) {
                 $this->error(__('Invalid file path.'));
                 return null;
             }
@@ -1369,7 +1369,7 @@ class Upload extends Element {
                 continue;
             }
             $postedStore = FileStorage::getStoreName((string)$storeRaw);
-            $finalPath = preg_replace('#^uploads/tmp/#', 'uploads/', $path, 1);
+            $finalPath = str_replace('uploads/tmp/', 'uploads/', $path);
             if ($finalPath === $path) {
                 continue;
             }
@@ -1379,13 +1379,14 @@ class Upload extends Element {
                 'mimeFallback' => $fileData['mime'] ?? null,
                 'existingFileStrategy' => 'overwrite',
             ];
+
             $newFile = FileStorage::move($path, $postedStore, $postedStore, $finalPath, $moveOptions);
             if (!$newFile) {
                 continue;
             }
 
             $merged = $fileData;
-            $merged['path'] = $newFile->metadata('path') ?? $finalPath;
+            $merged['path'] = $finalPath;
             $merged['store'] = $postedStore;
             $merged['mime'] = $newFile->mime();
             $merged['size'] = $newFile->size();
@@ -1415,6 +1416,10 @@ class Upload extends Element {
         $this->data()->request($packed);
         $this->files($packed);
         $this->_value = null;
+
+        if ($this->_dataManager !== null) {
+            $this->_dataManager->model()->set($this->name(), $packed);
+        }
     }
 
 /**
@@ -1426,7 +1431,6 @@ class Upload extends Element {
     private function _hasError(File $file, $fileData, $extension) {
         $mime = $file->mime();
         $error = $fileData['error'];
-
         if (!empty($error)) {
             return $this->_errorCode($error);
         } elseif (empty($mime)) {
@@ -1452,16 +1456,16 @@ class Upload extends Element {
         $refused = $this->_refuse;
         $accepted = $this->_accept;
 
-        $isValid = false;
         if ($accepted && $accepted !== '*') {
             foreach ($accepted as $type) {
                 if ($file->is($type)) {
                     return false;
                 }
             }
+            return $this->_errorCode(static::UPLOAD_ERR_ACCEPTED_FILES, $fileData);
         }
 
-        if ($isValid === false && $refused) {
+        if ($refused) {
             foreach ($refused as $type) {
                 if ($file->is($type)) {
                     return $this->_errorCode(static::UPLOAD_ERR_ACCEPTED_FILES, $fileData);
@@ -1469,7 +1473,7 @@ class Upload extends Element {
             }
         }
 
-        return $isValid;
+        return false;
     }
 
 /**
