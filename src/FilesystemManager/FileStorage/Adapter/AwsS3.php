@@ -151,12 +151,15 @@ class AwsS3 extends Adapter {
                     'original-filename' => $options['name'] ?? pathinfo($key, PATHINFO_BASENAME)
                 ] + $options['metadata']
             ]);
-            $objectUrl = $result->get('ObjectURL');
         } catch (S3Exception $e) {
             $this->_setError($e->getMessage());
             return null;
         }
-        return $objectUrl;
+        if (empty($result->get('ETag'))) {
+            $this->_setError('PutObject succeeded but returned no ETag — object may not have been stored.');
+            return null;
+        }
+        return $this->_getObjectUrl(parent::config('bucket'), $key, $options);
     }
 
 /**
