@@ -67,45 +67,25 @@ class Csrf extends Component {
  * @return void
  */
     public function startup($event) {
-        $this->validate($event);
-    }
-
-/**
- * Validates the CSRF token for POST data. If
- * the request is a GET request, and the cookie value is absent a cookie will be set.
- *
- * Once a cookie is set it will be copied into request->getParam('_csrfToken')
- * so that application and framework code can easily access the csrf token.
- *
- * RequestAction requests do not get checked, nor will
- * they set a cookie should it be missing.
- *
- * @param \Nata\Event\Event $event Event instance.
- * @return void
- */
-    public function validate($event = null) {
-        $controller = $this->_controller;
-        if ($event) {
-            $controller = $event->getSubject();
-        }
+        $controller = $event->getSubject();
         $request = $controller->request;
         $response = $controller->response;
-        $cookieName = $this->_config['cookieName'];
 
-        /* @var \Nata\Http\Request $request */
-        $cookieData = $request->cookies($cookieName);
-        if ($cookieData) {
-            $request->params['_csrfToken'] = $cookieData;
+        $cookie = $request->cookies($this->_config['cookieName']);
+        if ($cookie) {
+            $request->params['_csrfToken'] = $cookie;
         }
 
         if ($request->is('requested')) {
             return;
         }
 
-        if ($request->is('get') && $cookieData === null) {
+        if ($request->is('get') && $cookie === null) {
             $this->_setCookie($request, $response);
+            return;
         }
-        if ($request->is(['put', 'post', 'delete', 'patch']) || $request->data()) {
+
+        if ($request->is(['put', 'post', 'delete', 'patch'])) {
             $this->_validateToken($request);
             $request->data($this->_config['field'], null);
         }
