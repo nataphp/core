@@ -175,19 +175,25 @@ class Entity extends NataObject implements JsonSerializable, ArrayAccess {
     protected $_errors = [];
 
 /**
- * Map of properties in this entity that can be safely assigned, each
- * property name points to a boolean indicating its status. An empty array
- * means no properties are accessible
+ * Allowlist of properties that may be bulk-assigned via {@see fill()}.
  *
- * The special property '*' can also be mapped, meaning that any other property
- * not defined in the map will take its value. For example, `'*' => true`
- * means that any property not defined in the map will be accessible by default
+ * Only properties named here (or '*' to allow all) will be written when
+ * fill() is called with untrusted data such as request input. An empty
+ * array (the default) means nothing is fillable — every entity must
+ * explicitly declare what it accepts.
  *
- * @var array
+ * {@see set()} bypasses this list entirely and is reserved for the ORM and
+ * internal service code.
+ *
+ * ### Example
+ *
+ * ```php
+ * protected $_fillable = ['title', 'description', 'start_time', 'end_time'];
+ * ```
+ *
+ * @var array<string, bool>|string[]
  */
-    protected $_accessible = [
-        '*' => true
-    ];
+    protected $_fillable = [];
 
 /**
  * The alias of the repository this entity came from.
@@ -349,7 +355,7 @@ class Entity extends NataObject implements JsonSerializable, ArrayAccess {
  * @return $this
  */
     public function set(string|array $property, mixed $value = null, array $options = []) {
-        $options += ['setter' => true, 'guard' => true];
+        $options += ['setter' => true, 'guard' => false];
 
         if (is_string($property)) {
             $options['guard'] = false;
@@ -387,7 +393,7 @@ class Entity extends NataObject implements JsonSerializable, ArrayAccess {
             throw new InvalidArgumentException('Cannot set and integer property');
         }
 
-        if ($options['guard'] === true && !$this->accessible($p)) {
+        if ($options['guard'] === true && !$this->fillable($p)) {
             return false;
         }
 
@@ -1063,57 +1069,67 @@ class Entity extends NataObject implements JsonSerializable, ArrayAccess {
     }
 
 /**
- * Stores whether or not a property value can be changed or set in this entity.
- * The special property '*' can also be marked as accessible or protected, meaning
- * that any other property specified before will take its value. For example
- * `$entity->accessible('*', true)`  means that any property not specified already
- * will be accessible by default.
+ * Bulk-assign properties from untrusted input (e.g. request data).
  *
- * You can also call this method with an array of properties, in which case they
- * will each take the accessibility value specified in the second argument.
+ * Only properties listed in {@see $_fillable} are written; all others are
+ * silently ignored. Use {@see set()} when you control the data and do not
+ * need the allowlist enforced (ORM hydration, service layer).
  *
- * ### Example:
+ * ### Example
  *
- * ```
- * $entity->accessible('id', true); // Mark id as not protected
- * $entity->accessible('author_id', false); // Mark author_id as protected
- * $entity->accessible(['id', 'user_id'], true); // Mark both properties as accessible
- * $entity->accessible('*', false); // Mark all properties as protected
+ * ```php
+ * $entity->fill($this->request->data());
  * ```
  *
- * When called without the second param it will return whether or not the property
- * can be set.
+ * @param array $data Key/value pairs from untrusted input.
+ * @return $this
+ */
+    public function fill(array $data): static {
+        return $this->set($data, ['guard' => true]);
+    }
+
+/**
+ * Check or update which properties are fillable via {@see fill()}.
  *
- * ### Example:
+ * The special key '*' allows all properties when set to true.
  *
+ * ```php
+ * $entity->fillable('title');              // true/false — is it fillable?
+ * $entity->fillable('title', true);        // mark as fillable
+ * $entity->fillable(['a', 'b'], true);     // mark several at once
+ * $entity->fillable('*', true);            // allow everything (no restriction)
  * ```
- * $entity->accessible('id'); // Returns whether it can be set or not
- * ```
  *
- * @param string|array $property single or list of properties to change its accessibility
- * @param bool $set true marks the property as accessible, false will
- * mark it as protected.
+ * @param string|array $property Property name(s) to check or update.
+ * @param bool|null $set True to allow, false to deny, null to read.
  * @return $this|bool
  */
-    public function accessible($property, $set = null) {
+    public function fillable($property, $set = null) {
         if ($set === null) {
-            $value = $this->_accessible[$property] ?? null;
-            return ($value === null && !empty($this->_accessible['*'])) || $value;
+            $value = $this->_fillable[$property] ?? null;
+            return ($value === null && !empty($this->_fillable['*'])) || $value;
         }
 
         if ($property === '*') {
-            $this->_accessible = array_map(function ($p) use ($set) {
+            $this->_fillable = array_map(function ($p) use ($set) {
                 return (bool)$set;
-            }, $this->_accessible);
-            $this->_accessible['*'] = (bool)$set;
+            }, $this->_fillable);
+            $this->_fillable['*'] = (bool)$set;
             return $this;
         }
 
         foreach ((array)$property as $prop) {
-            $this->_accessible[$prop] = (bool)$set;
+            $this->_fillable[$prop] = (bool)$set;
         }
 
         return $this;
+    }
+
+/**
+ * @deprecated Use {@see fillable()} instead.
+ */
+    public function accessible($property, $set = null) {
+        return $set === null ? $this->fillable($property) : $this->fillable($property, $set);
     }
 
 /**
@@ -1359,7 +1375,7 @@ class Entity extends NataObject implements JsonSerializable, ArrayAccess {
             'new' => $this->isNew(),
             'wasNew' => $this->wasNew(),
             'isTransient' => $this->isTransient(),
-            'accessible' => array_filter($this->_accessible),
+            'fillable' => array_filter($this->_fillable),
             'properties' => $this->_properties,
             'dirty' => $this->_dirty,
             'cleaned' => $this->_cleaned,

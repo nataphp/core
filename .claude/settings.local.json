@@ -18,7 +18,9 @@
       "Bash(Get-ChildItem -Path 'C:\\\\wamp\\\\www\\\\apps\\\\proescala' -Directory)",
       "Bash(Select-Object Name)",
       "PowerShell(Get-ChildItem -Recurse \"C:\\\\wamp\\\\www\\\\apps\\\\proescala\\\\src\\\\Controller\" | Where-Object { $_.Extension -eq \".php\" } | ForEach-Object { $_.FullName })",
-      "PowerShell(Get-ChildItem -Recurse \"C:\\\\wamp\\\\www\\\\nataphp\\\\app\" | Where-Object { !$_.PSIsContainer } | ForEach-Object { $_.FullName.Replace\\(\"C:\\\\wamp\\\\www\\\\nataphp\\\\app\\\\\", \"\"\\) } | Sort-Object)"
+      "PowerShell(Get-ChildItem -Recurse \"C:\\\\wamp\\\\www\\\\nataphp\\\\app\" | Where-Object { !$_.PSIsContainer } | ForEach-Object { $_.FullName.Replace\\(\"C:\\\\wamp\\\\www\\\\nataphp\\\\app\\\\\", \"\"\\) } | Sort-Object)",
+      "Bash(cd /c/wamp/www/nataphp/core/frontend && find src -type f -name \"*.css\" -o -name \"*.scss\" | head -20)",
+      "Read(//c/c/wamp/www/nataphp/core/frontend/**)"
     ]
   }
 }
