@@ -42,8 +42,8 @@ class Yesno extends Radio {
 
         $this->inline(true)
             ->options()->loadAll([
-                __('Yes') => true,
-                __('No') => false
+                true => __('Yes'),
+                false => __('No')
             ]);
 
         $this->template('radio');
