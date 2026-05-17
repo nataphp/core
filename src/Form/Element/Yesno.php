@@ -15,6 +15,8 @@
 
 namespace Nata\Form\Element;
 
+use Nata\Form\OptionRegistry;
+
 /**
  * Yesno element.
  */
@@ -40,11 +42,21 @@ class Yesno extends Radio {
     public function beforeRender($event) {
         parent::beforeRender($event);
 
-        $this->inline(true)
-            ->options()->loadAll([
+        $valueasKey = OptionRegistry::valueAsKey();
+        if ($valueasKey) {
+            $options = [
                 true => __('Yes'),
                 false => __('No')
-            ]);
+            ];
+        } else {
+            $options = [
+                __('Yes') => true,
+                __('No') => false
+            ];
+        }
+
+        $this->inline(true)
+            ->options()->loadAll($options);
 
         $this->template('radio');
     }
