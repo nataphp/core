@@ -32,11 +32,10 @@ class Upload extends Controller {
 /**
  * File output.
  *
- * @param string $file Filename
  * @return \Nata\Http\Response
  */
     public function presignedFormUploadUrl() {
-        $this->Csrf->validate();
+        $this->loadComponent('Csrf');
 
         if (!$this->Auth->isAuthorized()) {
             return $this->response->json([
