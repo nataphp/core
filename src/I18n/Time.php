@@ -295,43 +295,97 @@ class Time extends DateTime {
  */
     public function modify(string $modifier): DateTime|false {
         if ($this->_immutable === true) {
-            throw new RuntimeException('Cannot modify immutable Time instance.');
+            $clonedInstance = clone $this;
+            $clonedInstance->_immutable = false;
+            return $clonedInstance->modify($modifier);
         }
         $modifier = $this->_modifierMap[$modifier] ?? $modifier;
         return parent::modify($modifier);
     }
 
+/**
+ * Sets the date.
+ * If immutable, returns a new instance with the date set.
+ *
+ * @param int $year Year.
+ * @param int $month Month.
+ * @param int $day Day.
+ * @return static
+ */
     public function setDate(int $year, int $month, int $day): static {
         if ($this->_immutable) {
-            throw new RuntimeException('Cannot modify immutable Time instance.');
+            $clonedInstance = clone $this;
+            $clonedInstance->_immutable = false;
+            return $clonedInstance->setDate($year, $month, $day);
         }
         return parent::setDate($year, $month, $day);
     }
 
+/**
+ * Sets the time.
+ * If immutable, returns a new instance with the time set.
+ *
+ * @param int $hour Hour.
+ * @param int $minute Minute.
+ * @param int $second Second.
+ * @param int $microsecond Microsecond.
+ * @return static
+ */
     public function setTime(int $hour, int $minute, int $second = 0, int $microsecond = 0): static {
         if ($this->_immutable) {
-            throw new RuntimeException('Cannot modify immutable Time instance.');
+            $clonedInstance = clone $this;
+            $clonedInstance->_immutable = false;
+            return $clonedInstance->setTime($hour, $minute, $second, $microsecond);
         }
         return parent::setTime($hour, $minute, $second, $microsecond);
     }
 
+/**
+ * Sets the Unix timestamp.
+ * If immutable, returns a new instance with the timestamp set.
+ *
+ * @param int $timestamp Unix timestamp.
+ * @return static
+ */
     public function setTimestamp(int $timestamp): static {
         if ($this->_immutable) {
-            throw new RuntimeException('Cannot modify immutable Time instance.');
+            $clonedInstance = clone $this;
+            $clonedInstance->_immutable = false;
+            return $clonedInstance->setTimestamp($timestamp);
         }
         return parent::setTimestamp($timestamp);
     }
 
+/**
+ * Sets the timezone.
+ * If immutable, returns a new instance with the timezone set.
+ *
+ * @param \DateTimeZone $timezone Timezone.
+ * @return static
+ */
     public function setTimezone(DateTimeZone $timezone): static {
         if ($this->_immutable) {
-            throw new RuntimeException('Cannot modify immutable Time instance.');
+            $clonedInstance = clone $this;
+            $clonedInstance->_immutable = false;
+            return $clonedInstance->setTimezone($timezone);
         }
         return parent::setTimezone($timezone);
     }
 
+/**
+ * Sets the ISO date.
+ * If immutable, returns a new instance with the ISO date set.
+ *
+ * @param int $year Year.
+ * @param int $week ISO week number.
+ * @param int $dayOfWeek Day of the week (1 = Monday, 7 = Sunday).
+ * @return static
+ */
     public function setISODate(int $year, int $week, int $dayOfWeek = 1): static {
         if ($this->_immutable) {
-            throw new RuntimeException('Cannot modify immutable Time instance.');
+            $clonedInstance = clone $this;
+            $clonedInstance->_immutable = false;
+            return $clonedInstance->setISODate($year, $week, $dayOfWeek);
         }
         return parent::setISODate($year, $week, $dayOfWeek);
     }
