@@ -117,7 +117,7 @@ class OptionParser {
  * Subcommands for this Shell.
  *
  * @see \Nata\Console\OptionParser::addSubcommand()
- * @var array<string, \Nata\Console\InputSubcommand>
+ * @var array<string, \Nata\Console\InputSubCommand>
  */
     protected $_subcommands = [];
 
@@ -543,13 +543,13 @@ class OptionParser {
  *    specific option parsers. When help is generated for a subcommand, if a parser is present
  *    it will be used.
  *
- * @param \Nata\Console\InputSubcommand|string $name Name of the subcommand.
- *   Will also accept an instance of InputSubcommand.
+ * @param \Nata\Console\InputSubCommand|string $name Name of the subcommand.
+ *   Will also accept an instance of InputSubCommand.
  * @param array<string, mixed> $options Array of params, see above.
  * @return $this
  */
     public function addSubcommand($name, array $options = []) {
-        if ($name instanceof InputSubcommand) {
+        if ($name instanceof InputSubCommand) {
             $command = $name;
             $name = $command->name();
         } else {
@@ -561,7 +561,7 @@ class OptionParser {
             ];
             $options += $defaults;
 
-            $command = new InputSubcommand($options);
+            $command = new InputSubCommand($options);
         }
         $this->_subcommands[$name] = $command;
         if ($this->_subcommandSort) {
@@ -590,7 +590,7 @@ class OptionParser {
  */
     public function addSubcommands(array $commands) {
         foreach ($commands as $name => $params) {
-            if ($params instanceof InputSubcommand) {
+            if ($params instanceof InputSubCommand) {
                 $name = $params;
                 $params = [];
             }
@@ -635,7 +635,7 @@ class OptionParser {
 /**
  * Get the array of defined subcommands
  *
- * @return array<string, \Nata\Console\InputSubcommand>
+ * @return array<string, \Nata\Console\InputSubCommand>
  */
     public function subcommands() {
         return $this->_subcommands;

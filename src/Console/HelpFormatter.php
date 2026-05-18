@@ -190,7 +190,7 @@ class HelpFormatter {
 /**
  * Iterate over a collection and find the longest named thing.
  *
- * @param array<\Nata\Console\InputOption|\Nata\Console\InputArgument|\Nata\Console\InputSubcommand> $collection The collection to find a max length of.
+ * @param array<\Nata\Console\InputOption|\Nata\Console\InputArgument|\Nata\Console\InputSubCommand> $collection The collection to find a max length of.
  * @return int
  */
     protected function _getMaxLength(array $collection): int {
