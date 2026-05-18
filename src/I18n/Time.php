@@ -183,7 +183,7 @@ class Time extends DateTime {
         parent::__construct($time, $timezone);
 
         if ($modifier) {
-            $this->modify($modifier);
+            parent::modify($modifier);
         }
     }
 
@@ -299,6 +299,41 @@ class Time extends DateTime {
         }
         $modifier = $this->_modifierMap[$modifier] ?? $modifier;
         return parent::modify($modifier);
+    }
+
+    public function setDate(int $year, int $month, int $day): static {
+        if ($this->_immutable) {
+            throw new RuntimeException('Cannot modify immutable Time instance.');
+        }
+        return parent::setDate($year, $month, $day);
+    }
+
+    public function setTime(int $hour, int $minute, int $second = 0, int $microsecond = 0): static {
+        if ($this->_immutable) {
+            throw new RuntimeException('Cannot modify immutable Time instance.');
+        }
+        return parent::setTime($hour, $minute, $second, $microsecond);
+    }
+
+    public function setTimestamp(int $timestamp): static {
+        if ($this->_immutable) {
+            throw new RuntimeException('Cannot modify immutable Time instance.');
+        }
+        return parent::setTimestamp($timestamp);
+    }
+
+    public function setTimezone(DateTimeZone $timezone): static {
+        if ($this->_immutable) {
+            throw new RuntimeException('Cannot modify immutable Time instance.');
+        }
+        return parent::setTimezone($timezone);
+    }
+
+    public function setISODate(int $year, int $week, int $dayOfWeek = 1): static {
+        if ($this->_immutable) {
+            throw new RuntimeException('Cannot modify immutable Time instance.');
+        }
+        return parent::setISODate($year, $week, $dayOfWeek);
     }
 
 /**
@@ -533,10 +568,7 @@ class Time extends DateTime {
  * @return int UNIX timestamp
  */
     public function utc() {
-        $timezone = $this->timezone();
-        $utctimetamp = $this->timezone('utc')->timestamp();
-        $this->timezone($timezone);
-        return $utctimetamp;
+        return $this->getTimestamp();
     }
 
 /**
@@ -1026,12 +1058,14 @@ class Time extends DateTime {
  */
     public function addBusinessDays(int $days): Time {
         $time = clone $this;
+        $time->_immutable = false;
         while ($days > 0) {
             $time->modify('+1 day');
             if ($time->isWorkday()) {
                 $days--;
             }
         }
+        $time->_immutable = $this->_immutable;
         return $time;
     }
 
