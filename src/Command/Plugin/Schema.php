@@ -121,14 +121,14 @@ class Schema extends Command {
             return $manifest['schema'];
         }
         $path = Plugin::getPluginSourcePath($plugin, $composerPath);
-        $schemaDir = $path . 'Config' . DS . 'Schema' . DS;
+        $schemaDir = $path . 'config' . DS . 'schema' . DS;
         if (!is_dir($schemaDir)) {
             return [];
         }
         $files = glob($schemaDir . '*.sql');
         $result = [];
         foreach ($files as $file) {
-            $result[] = 'Config/Schema/' . basename($file);
+            $result[] = 'config/schema/' . basename($file);
         }
         sort($result);
         return $result;

@@ -79,7 +79,7 @@ class Status extends Command {
         $pluginWebroot = $pluginPath . Inflector::dasherize($plugin);
         $hasPublicCopied = is_dir($pluginWebroot);
         $hasPublicSource = is_dir($sourcePath . 'public' . DS);
-        $schemaDir = $sourcePath . 'Config' . DS . 'Schema' . DS;
+        $schemaDir = $sourcePath . 'config' . DS . 'schema' . DS;
         $schemaFiles = is_dir($schemaDir) ? glob($schemaDir . '*.sql') : [];
         $schemaCount = count($schemaFiles);
 
