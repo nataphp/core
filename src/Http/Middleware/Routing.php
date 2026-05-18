@@ -54,7 +54,7 @@ class Routing implements MiddlewareInterface {
  */
     public function __construct(array $options = []) {
         $options += [
-            'configDir' => App::path('Config/')
+            'configDir' => App::path('config/')
         ];
         $this->_configDir = $options['configDir'];
     }

@@ -244,7 +244,7 @@ class Plugin {
         if ($config['routes'] === false) {
             return false;
         }
-        return (bool)include static::path($plugin) . 'Config' . DS . 'routes.inc.php';
+        return (bool)include static::path($plugin) . 'config' . DS . 'routes.inc.php';
     }
 
 /**
