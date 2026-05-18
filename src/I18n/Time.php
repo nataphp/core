@@ -1640,4 +1640,25 @@ class Time extends DateTime {
         return new Time('now', $timezone);
     }
 
+/**
+ * List each calendar date from $startDate through $endDate inclusive as Y-m-d strings.
+ *
+ * When $startDate is after $endDate, returns an empty list.
+ *
+ * @param string $startDate Start date (Y-m-d).
+ * @param string $endDate End date (Y-m-d).
+ * @return list<string>
+ */
+    public static function datesInRange(string $startDate, string $endDate): array {
+        $dates = [];
+        $cursor = (new self($startDate))->immutable(true);
+        $end = (new self($endDate))->immutable(true);
+        while ($cursor <= $end) {
+            $dates[] = $cursor->format('Y-m-d');
+            $cursor = $cursor->modify('+1 day');
+        }
+
+        return $dates;
+    }
+
 }
