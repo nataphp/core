@@ -58,7 +58,8 @@ class EnumSet extends IteratorIterator implements JsonSerializable {
     public function __construct(string $alias, array $values) {
         $this->_alias = $alias;
         foreach ($values as $value => $text) {
-            $values[$value] = new EnumItem($value, $text);
+            $values[$value] = $text instanceof EnumItem ?
+                $text : new EnumItem($value, $text);
         }
         $this->_values = $values;
         parent::__construct(new ArrayIterator($values));
