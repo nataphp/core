@@ -17,6 +17,7 @@
 namespace Nata\Service;
 
 use Exception;
+use Nata\Core\App;
 use Nata\Core\NataObject;
 use Nata\Event\Listener;
 use Nata\Filesystem\File;
@@ -58,7 +59,7 @@ class Service extends NataObject implements Listener {
     public function __construct(array $config = []) {
         $this->config($config);
 
-        $this->name = $config['name'] ?? null;
+        $this->name = $config['name'] ?? App::classShortName(get_called_class());
         $this->domain = $config['domain'] ?? null;
 
         $this->initialize($config);
