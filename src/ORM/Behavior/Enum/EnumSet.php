@@ -97,14 +97,30 @@ class EnumSet extends IteratorIterator implements JsonSerializable {
     }
 
 /**
- * Get enum values.
+ * Return a new EnumSet containing only matching items.
  *
- * @param array $values Values to filter
- * @return EnumSet New EnumSet with the filtered new values
+ * Pass an array for an allowlist, or a callable that receives an EnumItem and returns bool.
+ *
+ * @param array|callable $filter Allowlist of values, or a callable predicate.
+ * @return EnumSet New EnumSet with only the matching values.
  */
-    public function filter(array $values) {
-        $values = array_flip($values);
-        return new EnumSet($this->_alias, array_intersect_key($this->_values, $values));
+    public function filter(array|callable $filter) {
+        if (is_callable($filter)) {
+            return new EnumSet($this->_alias, array_filter($this->_values, $filter));
+        }
+        $index = array_flip($filter);
+        return new EnumSet($this->_alias, array_intersect_key($this->_values, $index));
+    }
+
+/**
+ * Return a new EnumSet with the given values removed (denylist).
+ *
+ * @param array $values Values to exclude.
+ * @return EnumSet New EnumSet without the excluded values.
+ */
+    public function except(array $values) {
+        $index = array_flip($values);
+        return new EnumSet($this->_alias, array_diff_key($this->_values, $index));
     }
 
 /**
