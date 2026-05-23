@@ -468,7 +468,7 @@ const themes = {
 
             const info = document.createElement('p');
             info.className = 'text-muted text-configuration';
-            info.innerHTML += '<span>' + _t('Maximum: <strong>%s</strong>', _humanFileSize(config.maxFilesize * 1024 * 1024)) + '</span>';
+            info.innerHTML += '<span>' + _t('Maximum: <strong>%s</strong>', _humanFileSize(config.maxFilesize)) + '</span>';
             info.innerHTML += '&middot;<span>' + _t('Limit of <strong>%d</strong>', config.maxFiles) + '</span>';
 
             if (config.dimensions) {
@@ -1542,7 +1542,7 @@ export default class Upload {
             binaryBody: true,
             method: 'put',
             maxFiles: config.disabled ? 0 : config.maxFiles,
-            maxFilesize: config.maxFilesize,
+            maxFilesize: config.maxFilesize / 1024 / 1024,
             acceptedFiles: config.acceptedFiles || null,
             uploadMultiple: config.maxFiles > 1,
             parallelUploads: config.maxFiles > 1 ? config.maxFiles : 1,
@@ -1612,7 +1612,7 @@ export default class Upload {
 
             dictFallbackMessage: _t("Your browser does not support drag'n'drop file uploads."),
             dictFallbackText: _t('Please use the fallback form below to upload your files like in the olden days.'),
-            dictFileTooBig: _t('File is too big. Max filesize: %s.', _humanFileSize(config.maxFilesize * 1024 * 1024)),
+            dictFileTooBig: _t('File is too big. Max filesize: %s.', _humanFileSize(config.maxFilesize)),
             dictInvalidFileType: _t("You can't upload files of this type."),
             dictCancelUpload: _t('Cancel upload'),
             dictCancelUploadConfirmation: _t('Are you sure you want to cancel this upload?'),
