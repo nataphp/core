@@ -39,8 +39,10 @@ const datetime = {
                     input.value = (input.value || '').replace('T', ' ');
 
                     const useLocale = locale !== 'en' && flatpickr.l10ns[locale] ? { locale } : {};
+                    const dialogAncestor = input.closest('dialog');
                     const fp = flatpickr(input, {
                         ...useLocale,
+                        appendTo: dialogAncestor || document.body,
                         allowInput: true,
                         dateFormat: fmt,
                         enableTime: hasTime,
