@@ -642,7 +642,7 @@ window.__dxn = function(domain, context, singular, plural, count, args) {
 document.addEventListener('DOMContentLoaded', () => {
     nata.initXhr();
     nata.initAlerts();
-    document.addEventListener('htmx:afterSwap', () => {
+    document.addEventListener('htmx:afterSettle', () => {
         document.dispatchEvent(new CustomEvent('nata:load'));
     });
 });
