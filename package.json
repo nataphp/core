@@ -1,6 +1,6 @@
 {
   "name": "nataphp core",
-  "version": "1.0.46",
+  "version": "1.0.47",
   "description": "NataPHP Core",
   "type": "module",
   "main": "index.js",
