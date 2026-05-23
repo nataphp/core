@@ -116,9 +116,9 @@ const number = {
                 return __n('%d Byte', '%d Bytes', size, size);
             case Math.round(size / 1024) < 1024:
                 return window.__('%s KB', self.precision(size / 1024, 0));
-            case Math.round(size / 1024 / 1024, 2) < 1024:
+            case (size / 1024 / 1024) < 1024:
                 return window.__('%s MB', self.precision(size / 1024 / 1024, 2));
-            case Math.round(size / 1024 / 1024 / 1024, 2) < 1024:
+            case (size / 1024 / 1024 / 1024) < 1024:
                 return window.__('%s GB', self.precision(size / 1024 / 1024 / 1024, 2));
             default:
                 return window.__('%s TB', self.precision(size / 1024 / 1024 / 1024 / 1024, 2));
