@@ -2,7 +2,7 @@
  * Nata Notifier — vanilla JS notification toasts
  *
  * No jQuery, no Bootstrap dependency.
- * Styles: Nata/frontend/src/css/form/nata.notifier.css
+ * Styles: frontend/src/css/form/nata.notifier.css
  *
  * Usage:
  *   nata.notifier('Title');

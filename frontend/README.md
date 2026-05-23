@@ -5,7 +5,7 @@ jQuery-independent vanilla JS + CSS library for NataPHP forms and UI components.
 ## Structure
 
 ```
-Nata/frontend/
+frontend/
   src/
     js/          — source JS (ES modules)
     css/form/    — source CSS
@@ -36,12 +36,12 @@ npm run build:nata:css
 npm run watch:nata
 ```
 
-Output goes to `Nata/frontend/dist/`. Copy the contents to `public/nata/` to deploy.
+Output goes to `frontend/dist/`. Copy the contents to `public/nata/` to deploy.
 
 ## Deploy
 
 ```bash
-cp -r Nata/frontend/dist/* public/nata/
+cp -r frontend/dist/* public/nata/
 ```
 
 Also copy any third-party dependencies (e.g. `input-mask.min.js`) to `public/nata/`.

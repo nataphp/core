@@ -1,0 +1,38 @@
+{
+  "name": "nataphp core",
+  "version": "1.0.43",
+  "description": "NataPHP Core",
+  "type": "module",
+  "main": "index.js",
+  "scripts": {
+    "test": "echo \"Error: no test specified\" && exit 1",
+    "build:nata:js": "rollup -c rollup.nata.config.js",
+    "build:nata:js:watch": "rollup -c rollup.nata.config.js --watch",
+    "build:nata:css": "cleancss -o frontend/dist/nata.notifier.min.css frontend/src/css/form/nata.notifier.css && cleancss -o frontend/dist/nata.form.min.css frontend/src/css/form/nata.form.css && cleancss -o frontend/dist/nata.upload.min.css frontend/src/css/form/nata.upload.css && cleancss -o frontend/dist/nata.wizard.min.css frontend/src/css/form/nata.wizard.css && cleancss -o frontend/dist/nata.groups.min.css frontend/src/css/form/nata.groups.css && cpy \"frontend/src/css/form/*.css\" frontend/dist/",
+    "build:vendor": "cpy \"node_modules/flatpickr/dist/flatpickr.min.js\" \"node_modules/flatpickr/dist/flatpickr.min.css\" frontend/dist/vendor/flatpickr/ && cpy \"node_modules/flatpickr/dist/l10n/*.js\" frontend/dist/vendor/flatpickr/l10n/"
+  },
+  "repository": {
+    "type": "git",
+    "url": "git+https://github.com/nataphp/core.git"
+  },
+  "keywords": [],
+  "author": "",
+  "license": "ISC",
+  "bugs": {
+    "url": "https://github.com/nataphp/core/issues"
+  },
+  "homepage": "https://github.com/nataphp/core#readme",
+  "devDependencies": {
+    "@rollup/plugin-commonjs": "^29.0.2",
+    "@rollup/plugin-node-resolve": "^16.0.3",
+    "@rollup/plugin-terser": "^0.4.4",
+    "clean-css-cli": "^5.6.3",
+    "cpy-cli": "^6.0.0",
+    "rollup": "^4.60.0"
+  },
+  "dependencies": {
+    "flatpickr": "^4.6.13",
+    "smartcrop": "^2.0.5",
+    "sortablejs": "^1.15.6"
+  }
+}

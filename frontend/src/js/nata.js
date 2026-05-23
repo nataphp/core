@@ -498,6 +498,7 @@ const nata = {
                     this.getResponseHeader('content-type') || '',
                     () => this.responseText
                 );
+                document.dispatchEvent(new CustomEvent('nata:load'));
             });
 
             this.addEventListener('error', function () {
@@ -519,6 +520,7 @@ const nata = {
                 const redirectUrl = response.headers.get('nata-location');
                 const nataStatus  = +response.headers.get('nata-status');
                 const contentType = response.headers.get('content-type') || '';
+                document.dispatchEvent(new CustomEvent('nata:load'));
                 if (!redirectUrl && contentType.indexOf('json') === -1) { return response; }
                 return response.clone().text().then(body => {
                     handleNataResponse(redirectUrl, nataStatus, contentType, () => body);
@@ -640,4 +642,7 @@ window.__dxn = function(domain, context, singular, plural, count, args) {
 document.addEventListener('DOMContentLoaded', () => {
     nata.initXhr();
     nata.initAlerts();
+    document.addEventListener('htmx:afterSwap', () => {
+        document.dispatchEvent(new CustomEvent('nata:load'));
+    });
 });

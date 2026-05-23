@@ -98,4 +98,7 @@ if (document.readyState === 'loading') {
     form.init();
 }
 
+// Reinit after any XHR/fetch response or htmx swap
+document.addEventListener('nata:load', () => form.init());
+
 export default form;
