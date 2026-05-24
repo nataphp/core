@@ -15,6 +15,10 @@ const changes = {
      */
     init() {
         document.querySelectorAll('form.nata[data-detect-changes]:not([data-detect-changes="false"])').forEach(form => {
+            if (form.dataset.changesBound) {
+                return;
+            }
+            form.dataset.changesBound = '1';
             _disableSubmit(form);
             // Store baseline hash after components have had time to initialize
             setTimeout(() => {
@@ -67,7 +71,7 @@ const changes = {
 
         // Text inputs / textareas — debounced
         let keypressTimeout = null;
-        const textInputs = form.querySelectorAll('input:not([type="checkbox"]):not([type="radio"]), textarea');
+        const textInputs = form.querySelectorAll('input:not([type="checkbox"]):not([type="radio"]):not([type="hidden"]), textarea');
         textInputs.forEach(el => {
             if (el.classList.contains(DETECTION_CLASS)) {
                 return;
