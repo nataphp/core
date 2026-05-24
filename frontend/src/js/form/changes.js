@@ -14,7 +14,7 @@ const changes = {
      * Initialize change detection for all forms with data-detect-changes.
      */
     init() {
-        document.querySelectorAll('form.nata[data-detect-changes]').forEach(form => {
+        document.querySelectorAll('form.nata[data-detect-changes]:not([data-detect-changes="false"])').forEach(form => {
             _disableSubmit(form);
             // Store baseline hash after components have had time to initialize
             setTimeout(() => {
@@ -86,7 +86,7 @@ const changes = {
      * @param {HTMLFormElement} form
      */
     _check(form) {
-        if (!form.dataset.detectChanges) {
+        if (!form.dataset.detectChanges || form.dataset.detectChanges === 'false') {
             return;
         }
 
