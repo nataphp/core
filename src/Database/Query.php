@@ -599,6 +599,10 @@ class Query {
             if ($select instanceof Query) {
                 $this->getParameterManager()->add($select->params(), 'select');
                 $select = '(' . $select->sql() . ')';
+            } elseif ($select instanceof QueryExpression) {
+                $select = $select->getSql();
+            } elseif ($select instanceof QueryFunction) {
+                $select = (string) $select;
             } elseif ($select instanceof Closure) {
                 $select = $select($this);
             } elseif (!is_int($key)) {
