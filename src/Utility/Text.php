@@ -468,7 +468,7 @@ class Text {
  */
     public static function insert($str, $data, $options = []) {
         $defaults = [
-            'before' => ':', 'after' => null, 'escape' => '\\', 'format' => null, 'clean' => false
+            'before' => ':', 'after' => '', 'escape' => '\\', 'format' => null, 'clean' => false
         ];
 
         $options += $defaults;

@@ -308,6 +308,12 @@ class FileStorage {
             $source = static::_fixImageOrientation($source);
         }
 
+        if ($options['dryRun'] === true) {
+            $source->metadata('path', $path);
+            $source->metadata('store', $store);
+            return $source;
+        }
+
         $file = static::put(
             contents:$source->read(),
             store:$store,
