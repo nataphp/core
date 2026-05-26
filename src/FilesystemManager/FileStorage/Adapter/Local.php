@@ -33,7 +33,7 @@ class Local extends Adapter {
  * @var array
  */
     protected $_defaultConfig = [
-        'pathTemplate' => 'uploads/{mime_top_level}/{sha1_5}/{sha1}{extension}',
+        'pathTemplate' => 'uploads/{mime_top_level}/{sha256_5}/{sha256}{extension}',
         'prefix' => '',
         'root' => 'public',
         'endpoint' => null,

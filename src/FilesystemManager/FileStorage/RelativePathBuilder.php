@@ -74,7 +74,18 @@ class RelativePathBuilder {
         } elseif (is_string($data)) {
             $data = static::_extractDataFromFilename($data, $placeholders);
         } elseif (is_array($data)) {
-            $data = static::_extractData($data, $placeholders);
+            static::_extractData($data, $placeholders);
+        }
+
+        foreach ($placeholders as $placeholder) {
+            $parts = explode('_', $placeholder);
+            if (count($parts) === 2 && is_numeric($parts[1]) && $parts[1] > 0) {
+                $data[$placeholder] = substr($data[$parts[0]], 0, (int)$parts[1]);
+            }
+        }
+
+        if (isset($data['mime']) && !isset($data['mime_top_level']) && in_array('mime_top_level', $placeholders)) {
+            $data['mime_top_level'] = Mimetype::getTopLevel($data['mime']);
         }
 
         if ($options['checkMissing']) {
@@ -120,10 +131,6 @@ class RelativePathBuilder {
 
         return [
             'sha1' => $sha1,
-            'sha1_4' => substr($sha1, 0, 4),
-            'sha1_5' => substr($sha1, 0, 5),
-            'sha1_8' => substr($sha1, 0, 8),
-            'sha1_10' => substr($sha1, 0, 10),
             'extension' => '.' . $extension,
             'mime' => $mime,
             'mime_top_level' => $mimeTopLevel
@@ -134,11 +141,11 @@ class RelativePathBuilder {
  * Prepare given data.
  *
  * @param array $data Data
- * @return array Data
+ * @param array $placeholders Placeholders
+ * @return void
  */
-    protected static function _extractData(array $data): array {
+    protected static function _extractData(array &$data, array $placeholders): void {
         $data += [
-            'sha1' => null,
             'extension' => null,
             'mime' => null
         ];
@@ -148,25 +155,13 @@ class RelativePathBuilder {
         } elseif (!$data['extension'] && $data['mime']) {
             $data['extension'] = Mimetype::getExtension($data['mime']);
         }
-
         if ($data['extension']) {
             $data['extension'] = '.' . ltrim($data['extension'], '.');
         }
 
         $mimeTopLevel = null;
         if ($data['mime']) {
-            $mimeTopLevel = Mimetype::getTopLevel($data['mime']);
         }
-
-        $sha1 = $data['sha1'];
-        return $data + [
-            'sha1' => $sha1,
-            'sha1_4' => substr($sha1, 0, 4),
-            'sha1_5' => substr($sha1, 0, 5),
-            'sha1_8' => substr($sha1, 0, 8),
-            'sha1_10' => substr($sha1, 0, 10),
-            'mime_top_level' => $mimeTopLevel
-        ];
     }
 
 /**
@@ -178,15 +173,13 @@ class RelativePathBuilder {
  */
     protected static function _extractDataFromFile(File $file, array $placeholders): array {
         $sha1 = $file->sha1(true);
+        $sha256 = $file->hash('sha256');
         $mime = $file->mime();
         $mimeTopLevel = Mimetype::getTopLevel($mime);
 
         $data = [
             'sha1' => $sha1,
-            'sha1_4' => substr($sha1, 0, 4),
-            'sha1_5' => substr($sha1, 0, 5),
-            'sha1_8' => substr($sha1, 0, 8),
-            'sha1_10' => substr($sha1, 0, 10),
+            'sha256' => $sha256,
             'name' => function () use ($file) {
                 return $file->name();
             },
