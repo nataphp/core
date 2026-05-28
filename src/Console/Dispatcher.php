@@ -25,7 +25,9 @@ use MissingJobMethodException;
 use Nata\Console\ErrorHandler;
 use Nata\Core\Exception;
 use Nata\Http\BaseApplication;
+use Nata\Log\Log;
 use Nata\Utility\Inflector;
+use Throwable;
 
 /**
  * Job dispatcher handles dispatching cli commands.
@@ -188,6 +190,19 @@ class Dispatcher {
 
         $this->setErrorHandlers();
 
+        Log::config('debug', [
+            'engine' => 'File',
+            'path'   => LOGS . 'console' . DS,
+            'levels' => ['notice', 'info', 'debug'],
+            'file'   => 'debug',
+        ]);
+        Log::config('error', [
+            'engine' => 'File',
+            'path'   => LOGS . 'console' . DS,
+            'levels' => ['warning', 'error', 'critical', 'alert', 'emergency'],
+            'file'   => 'error',
+        ]);
+
         if (!defined('FULL_BASE_URL')) {
             define('FULL_BASE_URL', 'http://localhost');
         }
@@ -272,7 +287,14 @@ class Dispatcher {
             return $this->_helpOuput($optionParser, $subCommand ? $subCommandName : null);
         }
 
-        $result = $command->execute($args, $io);
+        try {
+            $result = $command->execute($args, $io);
+        } catch (Throwable $exception) {
+            $io->error($exception->getMessage());
+            Log::write('error', $exception->getMessage() . "\nTrace:\n" . $exception->getTraceAsString());
+            return Command::CODE_ERROR;
+        }
+
         if (is_int($result)) {
             return $result;
         }

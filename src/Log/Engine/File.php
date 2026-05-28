@@ -87,6 +87,10 @@ class File extends Base {
             $filename = $this->_path . $level . '.log';
         }
 
+        if (!is_dir($this->_path)) {
+            mkdir($this->_path, 0755, true);
+        }
+
         $output = date('Y-m-d H:i:s') . ' ' . ucfirst($level) . ': ' . $message . "\n";
 
         return file_put_contents($filename, $output, FILE_APPEND);
