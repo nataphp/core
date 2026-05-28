@@ -50,7 +50,7 @@ class File extends Base {
  * - `file` log file name
  * - `path` the path to save logs on.
  *
- * @param array $options Options for the FileLog, see above.
+ * @param array $config Options for the FileLog, see above.
  */
     public function __construct(array $config = []) {
         parent::__construct($config);
@@ -81,10 +81,9 @@ class File extends Base {
  * @return boolean success of write.
  */
     public function write($level, $message) {
+        $filename = $this->_path . $level . '.log';
         if (!empty($this->_file)) {
             $filename = $this->_path . $this->_file;
-        } else {
-            $filename = $this->_path . $level . '.log';
         }
 
         if (!is_dir($this->_path)) {

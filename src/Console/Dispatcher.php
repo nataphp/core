@@ -192,15 +192,15 @@ class Dispatcher {
 
         Log::config('debug', [
             'engine' => 'File',
-            'path'   => LOGS . 'console' . DS,
+            'path'   => LOGS,
             'levels' => ['notice', 'info', 'debug'],
-            'file'   => 'debug',
+            'file'   => 'console_debug',
         ]);
         Log::config('error', [
             'engine' => 'File',
-            'path'   => LOGS . 'console' . DS,
+            'path'   => LOGS,
             'levels' => ['warning', 'error', 'critical', 'alert', 'emergency'],
-            'file'   => 'error',
+            'file'   => 'console_error',
         ]);
 
         if (!defined('FULL_BASE_URL')) {
