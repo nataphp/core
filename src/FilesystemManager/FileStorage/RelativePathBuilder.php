@@ -59,7 +59,7 @@ class RelativePathBuilder {
  */
     public static function build(File|string|array $data, string $template, array $options = []): ?string {
         $options += [
-            'checkMissing' => false,
+            'checkMissing' => true,
             'before' => '{',
             'after' => '}'
         ];
@@ -79,7 +79,7 @@ class RelativePathBuilder {
 
         foreach ($placeholders as $placeholder) {
             $parts = explode('_', $placeholder);
-            if (count($parts) === 2 && is_numeric($parts[1]) && $parts[1] > 0) {
+            if (count($parts) === 2 && is_numeric($parts[1]) && $parts[1] > 0 && isset($data[$parts[0]])) {
                 $data[$placeholder] = substr($data[$parts[0]], 0, (int)$parts[1]);
             }
         }
