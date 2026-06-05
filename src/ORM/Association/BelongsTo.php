@@ -95,21 +95,13 @@ class BelongsTo extends Association {
  * Save BelongsTo entity in to association table.
  *
  * @param \Nata\ORM\Entity $sourceEntity Source entity
- * @param \Nata\ORM\Entity|array $data Related data
+ * @param \Nata\ORM\Entity|array $targetEntity Related data
  * @param array $options Save options
  * @return array Given entity with saved data
  */
     public function beforeSave(Entity $sourceEntity, $targetEntity, $options) {
         $foreignKey = $this->foreignKey();
         $foreignModel = $this->foreignModel();
-
-        if (empty($targetEntity)) {
-            $sourceEntity->set($foreignKey, null);
-            if ($this->polymorphic()) {
-                $sourceEntity->set($foreignModel, null);
-            }
-            return null;
-        }
 
         if ($this->polymorphic()) {
             $this->_setPolymorphicTarget($sourceEntity, $targetEntity);
@@ -119,6 +111,14 @@ class BelongsTo extends Association {
         [$primaryKey] = (array)$target->primaryKey();
         if (isset($targetEntity[$primaryKey]) && empty($targetEntity[$primaryKey])) {
             unset($targetEntity[$primaryKey]);
+        }
+
+        if (empty($targetEntity)) {
+            $sourceEntity->set($foreignKey, null);
+            if ($this->polymorphic()) {
+                $sourceEntity->set($foreignModel, null);
+            }
+            return null;
         }
 
         $targetEntity = $target->newEntity($targetEntity);
@@ -151,7 +151,7 @@ class BelongsTo extends Association {
  * Remove set foreign key after saving.
  *
  * @param \Nata\ORM\Entity $sourceEntity Source entity
- * @param \Nata\ORM\Entity|array $data Related data
+ * @param \Nata\ORM\Entity|array $targetEntity Related data
  * @param array $options Save options
  * @return \Nata\ORM\Entity Target entity
  */
@@ -163,7 +163,9 @@ class BelongsTo extends Association {
 /**
  * Set polymorphic target model from target entity.
  *
- * @param \Nata\ORM\Entity $targetEntity Target entity
+ * @param \Nata\ORM\Entity $sourceEntity Source entity
+ * @param \Nata\ORM\Entity|array $targetEntity Related data
+ * @return void
  */
     protected function _setPolymorphicTarget($sourceEntity, $targetEntity) {
         if (!($targetEntity instanceof Entity)) {
@@ -172,7 +174,7 @@ class BelongsTo extends Association {
                 $this->_name,
                 $sourceEntity->source()
             ));
-    }
+        }
         $this->target($targetEntity->source());
     }
 
@@ -267,7 +269,7 @@ class BelongsTo extends Association {
  * Build query to load associated table results.
  *
  * @param \Nata\ORM\Query $sourceQuery Entity
- * @param closure|array $builder Callable closure
+ * @param closure|array $containment Callable closure
  * @return \Nata\ORM\Query
  */
     public function buildQuery(Query $sourceQuery, $containment) {
@@ -278,7 +280,7 @@ class BelongsTo extends Association {
 /**
  * Build query to load associated table results.
  *
- * @param \Nata\ORM\Entity|array $entity Entity
+ * @param \Nata\ORM\Entity|array $row Row
  * @param array $containment Callable closure
  * @return \Nata\ORM\Entity|array
  */
