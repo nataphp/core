@@ -286,13 +286,88 @@ class Translate extends Behavior {
     }
 
 /**
+ * Expand locale-keyed arrays on translatable fields into _translations entries.
+ *
+ * Called at the start of beforeSave(). For each translatable field whose value
+ * is an associative array with keys matching the pattern 'pt' or 'pt-PT', each
+ * entry is written into the entity's _translations map. The base field is then
+ * set to null (pure i18n-table tables) or to the default-locale value (tables
+ * that carry a _locale column on the row).
+ *
+ * If _translations already contains entries for the locale being expanded, the
+ * field value is merged in rather than replacing the whole entry, so other
+ * fields on that translation object are preserved.
+ *
+ * @param \Nata\ORM\Entity $entity Entity being saved
+ * @return void
+ */
+    protected function _expandLocaleArrays(Entity $entity): void {
+        $fields = $this->config('fields');
+        $hasLocaleColumn = $this->_table->hasField('_locale');
+        $defaultLocale = $this->config('defaultLocale');
+        $allowEmptyTranslations = $this->config('allowEmptyTranslations');
+
+        foreach ($fields as $field) {
+            $rawValue = $entity->get($field);
+            if (!is_array($rawValue) || empty($rawValue)) {
+                continue;
+            }
+
+            foreach (array_keys($rawValue) as $localeKey) {
+                if (!is_string($localeKey) || !preg_match('/^[a-z]{2}(-[A-Z]{2})?$/', $localeKey)) {
+                    continue 2;
+                }
+            }
+
+            $existingTranslations = $entity->get('_translations') ?? [];
+            $className = get_class($entity);
+
+            foreach ($rawValue as $locale => $text) {
+                $text = is_string($text) ? $text : '';
+                if ($text === '' && !$allowEmptyTranslations) {
+                    continue;
+                }
+                if (!isset($existingTranslations[$locale]) || !($existingTranslations[$locale] instanceof Entity)) {
+                    $existingTranslations[$locale] = new $className([], ['markClean' => true]);
+                }
+                $existingTranslations[$locale]->set($field, $text);
+            }
+
+            $entity->set('_translations', $existingTranslations);
+            $entity->dirty('_translations', true);
+
+            if ($hasLocaleColumn) {
+                $baseText = $rawValue[$defaultLocale] ?? reset($rawValue);
+                $entity->set($field, is_string($baseText) && $baseText !== '' ? $baseText : null);
+            } else {
+                $entity->set($field, null);
+            }
+        }
+    }
+
+/**
  * Before Save event.
+ *
+ * Automatically expands locale-keyed arrays on translatable fields into proper
+ * _translations entries so callers can write:
+ *
+ *   $entity->set('title', ['pt' => 'Título', 'en' => 'Title']);
+ *
+ * instead of manually calling $entity->translation($locale)->set($field, $value)
+ * for each language. Recognised locale keys: 'pt' or 'pt-PT' format only.
+ *
+ * On tables with a _locale column the default-locale value is kept on the base
+ * field so the row column is never nulled out. On pure i18n-table setups the
+ * base field is set to null after expansion (translations are stored separately).
+ * Empty string values are skipped unless allowEmptyTranslations is true.
  *
  * @param \Nata\Event\Event $event Event instance
  * @param \Nata\ORM\Entity $entity Entity instance
  * @return \Nata\Event\Event Event instance
  */
     public function beforeSave(Event $event, Entity $entity) {
+        $this->_expandLocaleArrays($entity);
+
         $translationTable = $this->translationTable();
 
         $locale = $entity->get('_locale');
