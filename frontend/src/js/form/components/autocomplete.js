@@ -131,6 +131,7 @@ const autocomplete = {
                     if (original && !input.value) {
                         input.value = original;
                     }
+                    input.classList.remove('flexdatalist-set');
                 });
             });
 
