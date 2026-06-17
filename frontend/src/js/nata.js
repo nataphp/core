@@ -393,6 +393,53 @@ const nata = {
     notifier,
 
     /**
+     * Dynamic script loader. Call script('gmaps', cb) to ensure the Google Maps
+     * JS API is loaded before running cb. Reads the API key from
+     * <meta name="google-maps-api-key" content="...">.
+     * Multiple callers before load completes are queued and all flushed together.
+     *
+     * @param {string} name Script key — currently only 'gmaps' is supported
+     * @param {function} callback Called once the script is ready
+     */
+    script: (() => {
+        const loaded = {};
+        const loading = {};
+        const queues = {};
+
+        const loaders = {
+            gmaps() {
+                window._nataGmapsReady = () => {
+                    loaded.gmaps = true;
+                    (queues.gmaps || []).forEach(fn => fn());
+                    queues.gmaps = [];
+                };
+                const meta = document.querySelector('meta[name="google-maps-api-key"]');
+                const key = meta ? meta.getAttribute('content') : '';
+                if (!key) {
+                    console.warn('nata.script: <meta name="google-maps-api-key"> missing');
+                    return;
+                }
+                const s = document.createElement('script');
+                s.src = 'https://maps.googleapis.com/maps/api/js?key='
+                    + encodeURIComponent(key)
+                    + '&libraries=places&callback=_nataGmapsReady';
+                s.async = true;
+                s.defer = true;
+                document.head.appendChild(s);
+            }
+        };
+
+        return (name, cb) => {
+            if (loaded[name]) { cb(); return; }
+            (queues[name] = queues[name] || []).push(cb);
+            if (!loading[name] && loaders[name]) {
+                loading[name] = true;
+                loaders[name]();
+            }
+        };
+    })(),
+
+    /**
      * Redirect to a given URL.
      *
      * @param {string} url  Absolute or router-relative URL

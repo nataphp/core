@@ -160,6 +160,7 @@ const dialog = {
                 .then(r => r.text())
                 .then(html => {
                     bodyEl.innerHTML = html;
+                    document.dispatchEvent(new CustomEvent('nata:load'));
                     options.complete(dlg);
                 })
                 .catch(err => console.error('nata.dialog: failed to load ' + options.url, err));
