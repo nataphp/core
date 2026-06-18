@@ -217,7 +217,16 @@ class Proximity extends Behavior {
         $query->addSelect($selectDistance)
             // ->addParams([$radiusValue, $latitude, $longitude, $latitude])
             ->counter(function ($query) use ($selectDistance) {
-                return $query->addSelect($selectDistance)->groupBy('distance');
+                $primaryKeyField = $this->_table->aliasField($this->_table->primaryKey());
+
+                $query
+                    ->select('COUNT(*) OVER() AS __proximity_count__')
+                    ->addSelect($selectDistance)
+                    ->groupBy($primaryKeyField)
+                    ->limit(1);
+
+                $total = $query->fetchColumn();
+                return $total !== false ? (int)$total : 0;
             });
 
         if ($radius > 0) {

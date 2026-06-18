@@ -252,6 +252,17 @@ class Form extends Helper {
     }
 
 /**
+ * Has elements.
+ *
+ * @param array $params Smarty function parameters
+ * @return bool True if has elements, false otherwise
+ */
+    public function has($params) {
+        $params = $this->_params($params);
+        return !empty($this->_get($params));
+    }
+
+/**
  * Render elements.
  *
  * @param array $params Smarty function parameters
