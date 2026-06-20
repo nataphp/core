@@ -95,6 +95,34 @@ trait PluginCommandTrait {
     }
 
 /**
+ * Shell out to Composer to regenerate the autoloader.
+ * Used after editing the application's composer.json psr-4 map so newly
+ * registered local-plugin namespaces become loadable.
+ *
+ * @param Io $io Console I/O
+ * @return bool True on success
+ */
+    protected function _runComposerDumpAutoload(Io $io): bool {
+        if (!function_exists('exec')) {
+            $io->error('exec() is disabled. Run "composer dump-autoload" manually.');
+            return false;
+        }
+
+        $cmd = 'composer dump-autoload 2>&1';
+        $io->comment('Running: ' . $cmd);
+
+        $output = [];
+        $exitCode = 0;
+        exec($cmd, $output, $exitCode);
+
+        foreach ($output as $line) {
+            $io->out('  ' . $line);
+        }
+
+        return $exitCode === 0;
+    }
+
+/**
  * Find the vendor-relative path for an installed Composer package.
  * Returns a root-relative path (e.g. 'vendor/nataphp/notify') or null.
  *

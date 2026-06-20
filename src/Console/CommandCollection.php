@@ -58,9 +58,9 @@ class CommandCollection {
  *
  * @param string|null $name Name
  * @param string|null $parentCommand Parent command
- * @return Command|array<string, Command> Commands
+ * @return Command|array<string, Command>|null Command, all commands, or null when the named command cannot be loaded
  */
-    public function get(string $name = null, ?string $parentCommand = null): Command|array {
+    public function get(string $name = null, ?string $parentCommand = null): Command|array|null {
         if ($name === null) {
             return $this->_commands;
         }

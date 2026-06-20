@@ -128,6 +128,18 @@ class Install extends Command {
         $manifest = Plugin::getManifest($plugin, $composerPath);
         $io->info(sprintf('Installing plugin: %s', $plugin), 2);
 
+        // Local plugins are not separate Composer packages, so their namespace
+        // is only autoloadable if the app's composer.json maps it. Register it
+        // and regenerate the autoloader. Composer-distributed plugins already
+        // carry their own psr-4 map via "composer require", so this is skipped.
+        if ($isLocal && $this->_registerLocalAutoload($plugin, $io)) {
+            if (!$this->_runComposerDumpAutoload($io)) {
+                $io->error('  composer dump-autoload failed. Run it manually before using the plugin.');
+                return Command::CODE_ERROR;
+            }
+            $io->success('  Autoloader regenerated.');
+        }
+
         if (!$skipAssets) {
             $hasPublic = is_dir($sourcePath . 'public' . DS);
             if ($manifest !== null && isset($manifest['public']) && !$manifest['public']) {
@@ -169,6 +181,62 @@ class Install extends Command {
         $io->success(sprintf('Plugin "%s" installed successfully.', $plugin));
 
         return Command::CODE_SUCCESS;
+    }
+
+/**
+ * Ensure the application's composer.json maps a local plugin's PSR-4 namespace.
+ *
+ * Local plugins (under plugins/<Name>/) are not standalone Composer packages,
+ * so their classes only autoload when the app's composer.json registers
+ * "<Plugin>\\" => "plugins/<Plugin>/src/". Adds the entry when missing; leaves
+ * an existing mapping untouched.
+ *
+ * @param string $plugin Plugin name in CamelCase.
+ * @param Io $io Console I/O.
+ * @return bool True when an entry was added (autoloader must be regenerated), false otherwise.
+ */
+    protected function _registerLocalAutoload(string $plugin, Io $io): bool {
+        $composerFile = ROOT . 'composer.json';
+        if (!is_file($composerFile)) {
+            $io->warning('  composer.json not found; skipping autoload registration.');
+            return false;
+        }
+
+        if (!is_dir(ROOT . 'plugins' . DS . $plugin . DS . 'src')) {
+            $io->comment('  No src/ directory; skipping autoload registration.');
+            return false;
+        }
+
+        $json = json_decode((string)@file_get_contents($composerFile), true);
+        if (!is_array($json)) {
+            $io->warning('  Could not parse composer.json; skipping autoload registration.');
+            return false;
+        }
+
+        $namespace = $plugin . '\\';
+        $relativePath = 'plugins/' . $plugin . '/src/';
+
+        $existing = $json['autoload']['psr-4'][$namespace] ?? null;
+        if ($existing !== null) {
+            $io->comment(sprintf('  Autoload already registered: %s => %s', $namespace, $existing));
+            return false;
+        }
+
+        $json['autoload']['psr-4'][$namespace] = $relativePath;
+
+        $encoded = json_encode($json, JSON_PRETTY_PRINT | JSON_UNESCAPED_SLASHES | JSON_UNESCAPED_UNICODE);
+        if ($encoded === false) {
+            $io->error('  Failed to encode composer.json.');
+            return false;
+        }
+
+        if (file_put_contents($composerFile, $encoded . "\n") === false) {
+            $io->error('  Failed to write composer.json.');
+            return false;
+        }
+
+        $io->success(sprintf('  Registered autoload: %s => %s', $namespace, $relativePath));
+        return true;
     }
 
 /**
