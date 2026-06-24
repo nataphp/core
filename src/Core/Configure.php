@@ -343,15 +343,23 @@ class Configure {
                 }
             }
 
+            // The skip-gate deliberately ignores getenv(). getenv()/putenv() operate on
+            // the process-global C environment, which is shared across every request in
+            // threaded/persistent SAPIs (Windows mpm_winnt, php-fpm worker reuse). When
+            // several apps share one worker, a value another app pushed there via putenv()
+            // leaks into this request, and trusting it would block this app from loading
+            // its own .env (the bug that produced cross-app database mix-ups). We honour
+            // only the request-scoped $_SERVER/$_ENV, which Apache SetEnv / fastcgi_param /
+            // variables_order=...E... populate per request for genuine external overrides.
             $hasServer = array_key_exists($key, $_SERVER);
             $hasEnv = array_key_exists($key, $_ENV);
-            $hasGetenv = getenv($key) !== false;
-            if ($overwrite || (!$hasServer && !$hasEnv && !$hasGetenv)) {
+            if ($overwrite || (!$hasServer && !$hasEnv)) {
                 $_ENV[$key] = $val;
                 if ($overwrite || !$hasServer) {
                     $_SERVER[$key] = $val;
                 }
-                putenv($key . '=' . $val);
+                // Intentionally NOT calling putenv(): it would push this value into the
+                // shared process environment and leak into other apps' requests (see above).
             }
         }
 
