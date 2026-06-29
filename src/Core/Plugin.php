@@ -221,7 +221,7 @@ class Plugin {
         }
         $path = static::path($plugin);
         if ($config['bootstrap'] === true) {
-            return include $path . 'Config' . DS . 'bootstrap.inc.php';
+            return include $path . 'config' . DS . 'bootstrap.inc.php';
         }
         return true;
     }
