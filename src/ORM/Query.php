@@ -772,6 +772,10 @@ class Query extends DatabaseQuery implements JsonSerializable, IteratorAggregate
             }
         }
 
+        if (is_array($results)) {
+            $this->eagerLoader()->parentRows($results);
+        }
+
         return $this->_result = $this->_decorateResults($results);
     }
 

@@ -849,7 +849,7 @@ class BelongsToMany extends Association {
 
         $sourceId = $this->_extractPropertyValue($entity, 'id');
         if (empty($sourceId)) {
-            return new ResultSet($query, []);
+            return $this->_setTargetQuery($entity, new ResultSet($query, []));
         }
 
         $query = $this->_queryBuilder('contain', $containment, $query)
@@ -864,32 +864,157 @@ class BelongsToMany extends Association {
         }
 
         if ($this->_through) {
-            $prefixedFields = $this->_autoFields($junctionTable, $query, $junctionTable->registryAlias());
-
-            [$p, $registryAlias] = pluginSplit($junctionTable->registryAlias());
-
-            $query->formatResults(function (CollectionInterface $resultSet) use ($junctionTable, $registryAlias, $prefixedFields) {
-                foreach ($resultSet as $index => $entity) {
-                    if ($entity instanceof Entity) {
-                        $joinEntity = $junctionTable->newEntity();
-
-                        foreach ($entity->extract($prefixedFields, false) as $field => $value) {
-                            [$m, $_field] = explode('__', $field);
-                            $joinEntity[$_field] = $value;
-                            unset($entity[$field]);
-                        }
-                        $entity->set('_joinData', $joinEntity);
-
-                        $joinEntity->isNew(false);
-                        $joinEntity->clean();
-                    }
-                }
-                return $resultSet;
-            });
+            $this->_attachJoinData($query, $junctionTable);
         }
 
         $entity = $this->_setTargetQuery($entity, $query);
         return $entity;
+    }
+
+/**
+ * Select alias used to carry the junction foreign key on each batched
+ * target row for grouping. Named to avoid clashing with real target
+ * columns; it is stripped from every entity after grouping.
+ *
+ * @var string
+ */
+    const BATCH_SOURCE_KEY = '_nata_batch_source_key';
+
+/**
+ * Batch-load the association for all parent rows with one IN() query per
+ * key chunk.
+ *
+ * Joins the junction table filtered by every parent id at once, selecting
+ * the junction foreign key as a grouping column, and groups the target
+ * entities by source parent. Polymorphic-target and 'single' => true
+ * associations cannot be batched and fall back to the per-row path.
+ *
+ * @param array $parentRows Raw parent result rows.
+ * @param array $containment Normalized containment configuration.
+ * @return array|null Batch data with children grouped by parent id, or null to fall back.
+ */
+    public function eagerLoad(array $parentRows, array $containment) {
+        if ($this->_single || $this->polymorphicTarget() === true) {
+            return null;
+        }
+
+        $junctionTable = $this->junction();
+        if (!$junctionTable) {
+            return null;
+        }
+
+        $parentIds = $this->_collectBatchKeys($parentRows, 'id');
+
+        $childrenBySourceId = [];
+        foreach ($this->_batchKeyChunks($parentIds) as $parentIdChunk) {
+            $targetQuery = $this->_buildBatchChunkQuery($parentIdChunk, $containment, $junctionTable);
+            if ($targetQuery === null) {
+                return null;
+            }
+
+            foreach ($targetQuery->all() as $targetEntity) {
+                $sourceId = $this->_extractPropertyValue($targetEntity, self::BATCH_SOURCE_KEY);
+                unset($targetEntity[self::BATCH_SOURCE_KEY]);
+                $childrenBySourceId[$sourceId][] = $targetEntity;
+            }
+        }
+
+        return ['map' => $childrenBySourceId];
+    }
+
+/**
+ * Build the batched target query for one chunk of parent ids.
+ *
+ * Mirrors the per-row mapResult() query construction (association finder,
+ * conditions and sort via find(), contain builder applied, junction join,
+ * through-association _joinData) but joins on the target primary key and
+ * filters the junction foreign key with IN() instead of a single value.
+ *
+ * @param array $parentIdChunk Chunk of distinct parent id values.
+ * @param array $containment Normalized containment configuration.
+ * @param \Nata\ORM\Table $junctionTable Junction table instance.
+ * @return \Nata\ORM\Query|null Chunk query, or null when the builder made
+ *   the query unbatchable (limit/offset/single).
+ */
+    private function _buildBatchChunkQuery(array $parentIdChunk, array $containment, Table $junctionTable) {
+        $target = $this->target();
+        $foreignKey = $this->foreignKey();
+        $targetForeignKey = $this->targetForeignKey();
+
+        $targetQuery = $this->find()
+            ->select($this->_associationAliasField('*'))
+            ->from($target->table(), $this->_associationAlias());
+
+        $targetQuery = $this->_queryBuilder('contain', $containment, $targetQuery);
+
+        if (!$this->_isBatchableQuery($targetQuery)) {
+            return null;
+        }
+
+        $targetQuery
+            ->leftJoin([
+                'table' => $junctionTable->table(),
+                'alias' => $junctionTable->alias(),
+                'conditions' => $junctionTable->aliasField($targetForeignKey) . ' = ' . $this->_associationAliasField($target->primaryKey())
+            ])
+            ->andWhere([$junctionTable->aliasField($foreignKey) => $parentIdChunk])
+            ->addSelect([$junctionTable->aliasField($foreignKey) . ' AS ' . self::BATCH_SOURCE_KEY]);
+
+        if ($this->_through) {
+            $this->_attachJoinData($targetQuery, $junctionTable);
+        }
+
+        return $targetQuery;
+    }
+
+/**
+ * Populate a parent row from the batch lookup map.
+ *
+ * Assigns the plural association property with the parent's linked target
+ * entities as a prepared ResultSet (or an empty one), matching the
+ * per-row mapResult() output shape.
+ *
+ * @param \Nata\ORM\Entity|array $row Parent row being prepared.
+ * @param array $batch Batch data returned by eagerLoad().
+ * @param array $containment Normalized containment configuration.
+ * @return \Nata\ORM\Entity|array Row with the association property set.
+ */
+    public function mapBatchedResult($row, array $batch, array $containment) {
+        return $this->_mapBatchedManyResult($row, $batch);
+    }
+
+/**
+ * Select the junction table fields and fold them into each result
+ * entity's _joinData property.
+ *
+ * Extracted from the per-row mapResult()/of() implementations so the
+ * batched query applies the exact same through-association treatment.
+ *
+ * @param \Nata\ORM\Query $targetQuery Target query being built.
+ * @param \Nata\ORM\Table $junctionTable Junction table instance.
+ * @return void
+ */
+    protected function _attachJoinData(Query $targetQuery, Table $junctionTable) {
+        $prefixedFields = $this->_autoFields($junctionTable, $targetQuery, $junctionTable->registryAlias());
+
+        $targetQuery->formatResults(function (CollectionInterface $resultSet) use ($junctionTable, $prefixedFields) {
+            foreach ($resultSet as $index => $entity) {
+                if ($entity instanceof Entity) {
+                    $joinEntity = $junctionTable->newEntity();
+
+                    foreach ($entity->extract($prefixedFields, false) as $field => $value) {
+                        [$m, $_field] = explode('__', $field);
+                        $joinEntity[$_field] = $value;
+                        unset($entity[$field]);
+                    }
+                    $entity->set('_joinData', $joinEntity);
+
+                    $joinEntity->isNew(false);
+                    $joinEntity->clean();
+                }
+            }
+            return $resultSet;
+        });
     }
 
 /**
@@ -929,27 +1054,7 @@ class BelongsToMany extends Association {
         ])->andWhere($this->_associationAliasField('id') . ' = ' . $junctionTable->aliasField($targetForeignKey));
 
         if ($this->_through) {
-            $prefixedFields = $this->_autoFields($junctionTable, $query, $junctionTable->registryAlias());
-
-            [$p, $registryAlias] = pluginSplit($junctionTable->registryAlias());
-            $query->formatResults(function (CollectionInterface $resultSet) use ($junctionTable, $registryAlias, $prefixedFields) {
-                foreach ($resultSet as $index => $entity) {
-                    if ($entity instanceof Entity) {
-                        $joinEntity = $junctionTable->newEntity();
-
-                        foreach ($entity->extract($prefixedFields, false) as $field => $value) {
-                            [$m, $_field] = explode('__', $field);
-                            $joinEntity[$_field] = $value;
-                            unset($entity[$field]);
-                        }
-                        $entity->set('_joinData', $joinEntity);
-
-                        $joinEntity->isNew(false);
-                        $joinEntity->clean();
-                    }
-                }
-                return $resultSet;
-            });
+            $this->_attachJoinData($query, $junctionTable);
         }
 
         if ($queryBuilder) {

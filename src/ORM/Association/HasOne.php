@@ -333,6 +333,101 @@ class HasOne extends Association {
     }
 
 /**
+ * Batch-load the association for all parent rows with one IN() query per
+ * key chunk.
+ *
+ * Runs the same target query mapResult() builds per row, but filtered by
+ * every parent id at once, keeping the first matching target entity per
+ * parent — the same record the per-row single(true) query returns.
+ *
+ * @param array $parentRows Raw parent result rows.
+ * @param array $containment Normalized containment configuration.
+ * @return array|null Batch data with one entity per foreign key, or null to fall back.
+ */
+    public function eagerLoad(array $parentRows, array $containment) {
+        $foreignKey = $this->foreignKey();
+        $parentIds = $this->_collectBatchKeys($parentRows, 'id');
+
+        $entitiesByForeignKey = [];
+        foreach ($this->_batchKeyChunks($parentIds) as $parentIdChunk) {
+            $targetQuery = $this->_buildBatchChunkQuery($parentIdChunk, $containment);
+            if ($targetQuery === null) {
+                return null;
+            }
+
+            foreach ($targetQuery->all() as $targetEntity) {
+                $foreignKeyValue = $this->_extractPropertyValue($targetEntity, $foreignKey);
+                if (!isset($entitiesByForeignKey[$foreignKeyValue])) {
+                    $entitiesByForeignKey[$foreignKeyValue] = $targetEntity;
+                }
+            }
+        }
+
+        return ['map' => $entitiesByForeignKey];
+    }
+
+/**
+ * Build the batched target query for one chunk of parent ids.
+ *
+ * Mirrors the per-row mapResult() query construction (target table with
+ * the association alias, contain builder applied, polymorphic condition,
+ * association fields selected) but filters by foreign key IN() instead of
+ * a single value.
+ *
+ * @param array $parentIdChunk Chunk of distinct parent id values.
+ * @param array $containment Normalized containment configuration.
+ * @return \Nata\ORM\Query|null Chunk query, or null when the builder made
+ *   the query unbatchable (limit/offset/single).
+ */
+    private function _buildBatchChunkQuery(array $parentIdChunk, array $containment) {
+        $foreignKey = $this->foreignKey();
+        $source = $this->source();
+        $target = $this->target();
+
+        $targetQuery = $this->_queryBuilder(
+            'contain',
+            $containment,
+            $target->query()->from($target->table(), $this->_associationAlias())
+        );
+
+        if (!$this->_isBatchableQuery($targetQuery)) {
+            return null;
+        }
+
+        $targetQuery->andWhere([$this->_associationAliasField($foreignKey) => $parentIdChunk]);
+
+        if ($this->polymorphic()) {
+            $targetQuery->andWhere([$this->_associationAliasField($this->foreignModel()) => $source->registryAlias()]);
+        }
+
+        $this->_selectAssociationField($targetQuery, '*', $this->_associationAlias());
+
+        return $targetQuery;
+    }
+
+/**
+ * Populate a parent row from the batch lookup map.
+ *
+ * Assigns the singularized association property with the parent's target
+ * entity or null, matching the per-row _setTargetQuery() output — which
+ * singularizes even a custom plural propertyName for single associations.
+ *
+ * @param \Nata\ORM\Entity|array $row Parent row being prepared.
+ * @param array $batch Batch data returned by eagerLoad().
+ * @param array $containment Normalized containment configuration.
+ * @return \Nata\ORM\Entity|array Row with the association property set.
+ */
+    public function mapBatchedResult($row, array $batch, array $containment) {
+        $sourceId = $this->_extractPropertyValue($row, 'id');
+
+        $row[Inflector::singularize($this->propertyName())] = $sourceId !== null
+            ? ($batch['map'][$sourceId] ?? null)
+            : null;
+
+        return $row;
+    }
+
+/**
  * Build query associated results of given entity.
  *
  * @param \Nata\ORM\Entity|array $entity Entity

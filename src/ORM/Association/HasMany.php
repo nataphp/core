@@ -322,7 +322,7 @@ class HasMany extends Association {
 
         $sourceId = $this->_extractPropertyValue($entity, 'id');
         if (empty($sourceId)) {
-            return new ResultSet($query, []);
+            return $this->_setTargetQuery($entity, new ResultSet($query, []));
         }
 
         $query = $this->_queryBuilder('contain', $builder, $query)
@@ -336,6 +336,98 @@ class HasMany extends Association {
         }
 
         return $this->_setTargetQuery($entity, $query);
+    }
+
+/**
+ * Batch-load the association for all parent rows with one IN() query per
+ * key chunk.
+ *
+ * Runs the same target query mapResult() builds per row, but filtered by
+ * every parent id at once, then groups the children by foreign key value.
+ * Associations flagged 'single' => true fall back to the per-row path,
+ * which handles the singularized single-entity property assignment.
+ *
+ * @param array $parentRows Raw parent result rows.
+ * @param array $containment Normalized containment configuration.
+ * @return array|null Batch data with children grouped by foreign key, or null to fall back.
+ */
+    public function eagerLoad(array $parentRows, array $containment) {
+        if ($this->_single) {
+            return null;
+        }
+
+        $foreignKey = $this->foreignKey();
+        $parentIds = $this->_collectBatchKeys($parentRows, 'id');
+
+        $childrenByForeignKey = [];
+        foreach ($this->_batchKeyChunks($parentIds) as $parentIdChunk) {
+            $targetQuery = $this->_buildBatchChunkQuery($parentIdChunk, $containment);
+            if ($targetQuery === null) {
+                return null;
+            }
+
+            foreach ($targetQuery->all() as $targetEntity) {
+                $foreignKeyValue = $this->_extractPropertyValue($targetEntity, $foreignKey);
+                $childrenByForeignKey[$foreignKeyValue][] = $targetEntity;
+            }
+        }
+
+        return ['map' => $childrenByForeignKey];
+    }
+
+/**
+ * Build the batched target query for one chunk of parent ids.
+ *
+ * Mirrors the per-row mapResult() query construction (association finder,
+ * conditions and sort via find(), contain builder applied, polymorphic
+ * conditions) but filters by foreign key IN() instead of a single value.
+ *
+ * @param array $parentIdChunk Chunk of distinct parent id values.
+ * @param array $containment Normalized containment configuration.
+ * @return \Nata\ORM\Query|null Chunk query, or null when the builder made
+ *   the query unbatchable (limit/offset/single).
+ */
+    private function _buildBatchChunkQuery(array $parentIdChunk, array $containment) {
+        $foreignKey = $this->foreignKey();
+        $source = $this->source();
+        $target = $this->target();
+
+        $targetQuery = $this->find()
+            ->select($this->_associationAliasField('*'))
+            ->from($target->table(), $this->_associationAlias());
+
+        $targetQuery = $this->_queryBuilder('contain', $containment, $targetQuery);
+
+        if (!$this->_isBatchableQuery($targetQuery)) {
+            return null;
+        }
+
+        $targetQuery->andWhere([$this->_associationAliasField($foreignKey) => $parentIdChunk]);
+
+        if ($this->polymorphic()) {
+            $targetQuery->andWhere([$this->_associationAliasField($this->foreignModel()) => $source->registryAlias()]);
+            if ($this->_foreignAssociationName) {
+                $targetQuery->andWhere([$this->_associationAliasField($this->_foreignAssociationName) => $this->_name]);
+            }
+        }
+
+        return $targetQuery;
+    }
+
+/**
+ * Populate a parent row from the batch lookup map.
+ *
+ * Assigns the plural association property with the parent's children as a
+ * prepared ResultSet (or an empty one), matching the per-row mapResult()
+ * output shape.
+ *
+ * @param \Nata\ORM\Entity|array $row Parent row being prepared.
+ * @param array $batch Batch data returned by eagerLoad().
+ * @param array $containment Normalized containment configuration.
+ * @return \Nata\ORM\Entity|array Row with the association property set.
+ */
+    public function mapBatchedResult($row, array $batch, array $containment) {
+        return $this->_mapBatchedManyResult($row, $batch);
     }
 
 /**

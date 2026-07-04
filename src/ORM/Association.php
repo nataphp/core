@@ -1153,6 +1153,120 @@ class Association extends NataObject {
     public function mapResult($row, $build) {return $row;}
 
 /**
+ * Batch-load this association for a whole result set with a single query.
+ *
+ * Association types that support batching override this method to collect
+ * the relevant key values from all parent rows, run one IN() query and
+ * return a lookup map that mapBatchedResult() reads per row. Returning
+ * null signals that batching is not possible (unsupported configuration,
+ * per-association limit, no usable keys) and the per-row mapResult() path
+ * must be used instead.
+ *
+ * @param array $parentRows Raw parent result rows.
+ * @param array $containment Normalized containment configuration.
+ * @return array|null Batch data for mapBatchedResult(), or null to fall back.
+ */
+    public function eagerLoad(array $parentRows, array $containment) {
+        return null;
+    }
+
+/**
+ * Populate a single row from a batch previously built by eagerLoad().
+ *
+ * The base implementation returns the row unchanged; association types
+ * that implement eagerLoad() override this with a lookup into the batch
+ * map, assigning the same property name and value shape that the per-row
+ * mapResult() path produces.
+ *
+ * @param \Nata\ORM\Entity|array $row Parent row being prepared.
+ * @param array $batch Batch data returned by eagerLoad().
+ * @param array $containment Normalized containment configuration.
+ * @return \Nata\ORM\Entity|array Row with the association property set.
+ */
+    public function mapBatchedResult($row, array $batch, array $containment) {
+        return $row;
+    }
+
+/**
+ * Collect the distinct non-empty values of a property across parent rows.
+ *
+ * Used by eagerLoad() implementations to build the IN() key list. Empty
+ * values (null, 0, '') are skipped: rows without a usable key get an
+ * empty association property instead of participating in the batch query.
+ *
+ * @param array $parentRows Raw parent result rows.
+ * @param string $property Property/column name to collect.
+ * @return array Distinct non-empty values.
+ */
+    protected function _collectBatchKeys(array $parentRows, $property) {
+        $keyValues = [];
+        foreach ($parentRows as $parentRow) {
+            $keyValue = $this->_extractPropertyValue($parentRow, $property);
+            if (!empty($keyValue)) {
+                $keyValues[$keyValue] = true;
+            }
+        }
+        return array_keys($keyValues);
+    }
+
+/**
+ * Check whether a prepared target query can be executed as a batch.
+ *
+ * A query with a limit, an offset or single-record mode applies those
+ * constraints to the whole batch instead of per parent row, which would
+ * change results; such queries must run through the per-row path.
+ *
+ * @param Query $query Target query after the contain builder was applied.
+ * @return bool True when the query is safe to batch.
+ */
+    protected function _isBatchableQuery(Query $query) {
+        if ($query->single() === true) {
+            return false;
+        }
+        if ($query->limit() !== null) {
+            return false;
+        }
+        return !$query->offset();
+    }
+
+/**
+ * Split a batch key list into executable chunks.
+ *
+ * Keeps each IN() list bounded so very large parent result sets cannot
+ * exceed driver placeholder limits or the maximum packet size.
+ *
+ * @param array $keyValues Distinct key values.
+ * @return array List of key value chunks.
+ */
+    protected function _batchKeyChunks(array $keyValues) {
+        return array_chunk($keyValues, 1000);
+    }
+
+/**
+ * Populate a parent row with its grouped children from a batch map.
+ *
+ * Shared by the to-many association types: assigns the plural property
+ * with the parent's children wrapped in a prepared ResultSet, matching
+ * the per-row mapResult() output shape.
+ *
+ * @param \Nata\ORM\Entity|array $row Parent row being prepared.
+ * @param array $batch Batch data returned by eagerLoad().
+ * @return \Nata\ORM\Entity|array Row with the association property set.
+ */
+    protected function _mapBatchedManyResult($row, array $batch) {
+        $sourceId = $this->_extractPropertyValue($row, 'id');
+
+        $children = [];
+        if (!empty($sourceId) && isset($batch['map'][$sourceId])) {
+            $children = $batch['map'][$sourceId];
+        }
+
+        $row[$this->propertyName()] = new ResultSet(null, $children);
+
+        return $row;
+    }
+
+/**
  * Proxies property retrieval to the target table. This is handy for getting this
  * association's associations
  *

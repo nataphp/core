@@ -72,6 +72,24 @@ protected $_table;
         '_matchings' => null
     ];
 
+/**
+ * Raw parent rows of the query being prepared.
+ * Used to batch-load contained associations with a single IN() query
+ * instead of one query per parent row.
+ *
+ * @var array
+ */
+    protected $_parentRows = [];
+
+/**
+ * Batch results per containment alias.
+ * Each entry is the array returned by Association::eagerLoad(), or null
+ * when that association cannot be batched (per-row fallback).
+ *
+ * @var array
+ */
+    protected $_batches = [];
+
 
 /**
  * Constructor.
@@ -157,7 +175,7 @@ protected $_table;
  *
  * @param string|array $associations Associations
  * @param closure $builder Callable
- * @return \Nata\ORM\EagerLoader|array
+ * @return \Nata\ORM\Loader|array
  */
     private function _mergeContain($associations, $builder = null) {
         if ($associations === null) {
@@ -294,17 +312,75 @@ protected $_table;
     }
 
 /**
+ * Set the raw parent rows of the query being prepared.
+ *
+ * The rows allow contained associations to be batch-loaded with a single
+ * IN() query for the whole result set instead of one query per parent row.
+ * Any previously memoized batches are discarded.
+ *
+ * @param array $parentRows Raw result rows as fetched from the database.
+ * @return $this
+ */
+    public function parentRows(array $parentRows) {
+        $this->_parentRows = $parentRows;
+        $this->_batches = [];
+        return $this;
+    }
+
+/**
  * Contain associations.
+ *
+ * Associations that support it are loaded in batch: the first prepared row
+ * triggers one IN() query covering every parent row, and all rows are then
+ * populated from the memoized batch. Associations that cannot be batched
+ * (no parent rows available, per-association limit, unsupported type) keep
+ * the per-row mapResult() behavior.
  *
  * @param \Nata\ORM\Entity|array $row Entity/row
  * @return \Nata\ORM\Entity|array
  */
     public function prepareResult($row) {
         $associations = $this->_table->associations();
-        foreach ($this->_getNormalized('containments') as $alias => $containment) {
-            $row = $associations->get($alias)->mapResult($row, $containment + $this->_defaultOptions);
+        $containments = $this->_getNormalized('containments');
+        foreach ($containments as $alias => $containment) {
+            $association = $associations->get($alias);
+            $containment = $containment + $this->_defaultOptions;
+
+            $batch = $this->_getBatch($association, $alias, $containment);
+            if ($batch !== null) {
+                $row = $association->mapBatchedResult($row, $batch, $containment);
+            } else {
+                $row = $association->mapResult($row, $containment);
+            }
         }
+
+        // Every containment has a memoized batch verdict after the first
+        // prepared row; the raw parent rows are dead weight from then on.
+        if (!empty($this->_parentRows) && count($this->_batches) >= count($containments)) {
+            $this->_parentRows = [];
+        }
+
         return $row;
+    }
+
+/**
+ * Get the memoized batch for an association, loading it on first request.
+ *
+ * Returns null when batching is not possible for this association, which
+ * makes prepareResult() fall back to the per-row mapResult() path.
+ *
+ * @param Association $association Association instance.
+ * @param string $alias Containment alias used as memoization key.
+ * @param array $containment Normalized containment configuration.
+ * @return array|null Batch data or null when not batchable.
+ */
+    private function _getBatch(Association $association, $alias, array $containment) {
+        if (!array_key_exists($alias, $this->_batches)) {
+            $this->_batches[$alias] = empty($this->_parentRows)
+                ? null
+                : $association->eagerLoad($this->_parentRows, $containment);
+        }
+        return $this->_batches[$alias];
     }
 
 /**

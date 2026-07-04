@@ -316,6 +316,175 @@ class BelongsTo extends Association {
     }
 
 /**
+ * Batch-load the association for all parent rows with one IN() query per
+ * key chunk.
+ *
+ * Collects the distinct foreign key values held by the parent rows and
+ * fetches every referenced target entity at once, indexed by primary key.
+ * Polymorphic associations are grouped by target model first, one query
+ * per referenced model.
+ *
+ * @param array $parentRows Raw parent result rows.
+ * @param array $containment Normalized containment configuration.
+ * @return array|null Batch data with an entity lookup map, or null to fall back.
+ */
+    public function eagerLoad(array $parentRows, array $containment) {
+        if ($this->polymorphic()) {
+            return $this->_eagerLoadPolymorphic($parentRows, $containment);
+        }
+
+        $foreignKeyValues = $this->_collectBatchKeys($parentRows, $this->foreignKey());
+
+        $entitiesByPrimaryKey = [];
+        if (!empty($foreignKeyValues)) {
+            $chunkQueries = $this->_buildBatchQueries($foreignKeyValues, $containment);
+            if ($chunkQueries === null) {
+                return null;
+            }
+            $entitiesByPrimaryKey = $this->_runBatchQueries($chunkQueries, $this->target()->primaryKey());
+        }
+
+        return ['map' => $entitiesByPrimaryKey];
+    }
+
+/**
+ * Batch-load a polymorphic association, one query per referenced target model.
+ *
+ * Parent rows are grouped by their foreign model column and each group is
+ * fetched with IN() queries against that model's table. All group queries
+ * are built and validated before any of them executes, so an unbatchable
+ * containment aborts without issuing partial work. The lookup map is keyed
+ * by model name first, then by primary key.
+ *
+ * @param array $parentRows Raw parent result rows.
+ * @param array $containment Normalized containment configuration.
+ * @return array|null Batch data with a per-model entity lookup map, or null to fall back.
+ */
+    protected function _eagerLoadPolymorphic(array $parentRows, array $containment) {
+        $foreignKey = $this->foreignKey();
+        $foreignModel = $this->foreignModel();
+
+        $keyValuesByModel = [];
+        foreach ($parentRows as $parentRow) {
+            $targetModel = $this->_extractPropertyValue($parentRow, $foreignModel);
+            $foreignKeyValue = $this->_extractPropertyValue($parentRow, $foreignKey);
+            if (!empty($targetModel) && !empty($foreignKeyValue)) {
+                $keyValuesByModel[$targetModel][$foreignKeyValue] = true;
+            }
+        }
+
+        $queriesByModel = [];
+        $primaryKeysByModel = [];
+        foreach ($keyValuesByModel as $targetModel => $keyValues) {
+            $this->target($targetModel);
+            $chunkQueries = $this->_buildBatchQueries(array_keys($keyValues), $containment);
+            if ($chunkQueries === null) {
+                return null;
+            }
+            $queriesByModel[$targetModel] = $chunkQueries;
+            $primaryKeysByModel[$targetModel] = $this->target()->primaryKey();
+        }
+
+        $entitiesByModel = [];
+        foreach ($queriesByModel as $targetModel => $chunkQueries) {
+            $entitiesByModel[$targetModel] = $this->_runBatchQueries($chunkQueries, $primaryKeysByModel[$targetModel]);
+        }
+
+        return ['map' => $entitiesByModel];
+    }
+
+/**
+ * Build one batched target query per chunk of key values.
+ *
+ * Mirrors the per-row mapResult() query construction (target table with
+ * the association alias, contain builder applied, association fields
+ * selected) but filters by primary key IN() instead of a single value.
+ * No query is executed here, so callers can validate batchability across
+ * all chunks/groups before issuing any SQL.
+ *
+ * @param array $foreignKeyValues Distinct foreign key values to fetch.
+ * @param array $containment Normalized containment configuration.
+ * @return array|null Chunk queries, or null when the builder made the
+ *   query unbatchable (limit/offset/single).
+ */
+    protected function _buildBatchQueries(array $foreignKeyValues, array $containment) {
+        $target = $this->target();
+        $targetPrimaryKey = $target->primaryKey();
+
+        $chunkQueries = [];
+        foreach ($this->_batchKeyChunks($foreignKeyValues) as $keyValueChunk) {
+            $targetQuery = $target->query()->from($target->table(), $this->_associationAlias());
+            $targetQuery = $this->_queryBuilder('contain', $containment, $targetQuery);
+
+            if (!$this->_isBatchableQuery($targetQuery)) {
+                return null;
+            }
+
+            $targetQuery->andWhere([
+                $this->_associationAliasField($targetPrimaryKey) => $keyValueChunk
+            ]);
+
+            $this->_selectAssociationField($targetQuery, '*', $this->_associationAlias());
+
+            $chunkQueries[] = $targetQuery;
+        }
+
+        return $chunkQueries;
+    }
+
+/**
+ * Execute the chunk queries and index the fetched entities by primary key.
+ *
+ * @param array $chunkQueries Queries built by _buildBatchQueries().
+ * @param string $targetPrimaryKey Primary key field of the target table.
+ * @return array Entities indexed by primary key value.
+ */
+    protected function _runBatchQueries(array $chunkQueries, $targetPrimaryKey) {
+        $entitiesByPrimaryKey = [];
+        foreach ($chunkQueries as $chunkQuery) {
+            foreach ($chunkQuery->all() as $targetEntity) {
+                $primaryKeyValue = $this->_extractPropertyValue($targetEntity, $targetPrimaryKey);
+                $entitiesByPrimaryKey[$primaryKeyValue] = $targetEntity;
+            }
+        }
+        return $entitiesByPrimaryKey;
+    }
+
+/**
+ * Populate a parent row from the batch lookup map.
+ *
+ * Assigns the singular association property with a clone of the referenced
+ * target entity — cloned because several parents can reference the same
+ * target, and the per-row path gave each parent an independent instance.
+ * Parents without a (resolvable) foreign key value get null, matching the
+ * per-row mapResult() output. Polymorphic rows without a foreign model
+ * value are returned untouched, also matching mapResult().
+ *
+ * @param \Nata\ORM\Entity|array $row Parent row being prepared.
+ * @param array $batch Batch data returned by eagerLoad().
+ * @param array $containment Normalized containment configuration.
+ * @return \Nata\ORM\Entity|array Row with the association property set.
+ */
+    public function mapBatchedResult($row, array $batch, array $containment) {
+        $entityMap = $batch['map'];
+
+        if ($this->polymorphic()) {
+            $targetModel = $this->_extractPropertyValue($row, $this->foreignModel());
+            if (empty($targetModel)) {
+                return $row;
+            }
+            $entityMap = $entityMap[$targetModel] ?? [];
+        }
+
+        $foreignKeyValue = $this->_extractPropertyValue($row, $this->foreignKey());
+        $targetEntity = $foreignKeyValue !== null ? ($entityMap[$foreignKeyValue] ?? null) : null;
+
+        $row[Inflector::singularize($this->propertyName())] = $targetEntity !== null ? clone $targetEntity : null;
+
+        return $row;
+    }
+
+/**
  * Build query associated results of given entity.
  *
  * @param \Nata\ORM\Entity $entity Entity

@@ -62,11 +62,15 @@ class ResultSet extends Collection implements JsonSerializable, ArrayAccess, Ser
 /**
  * Constructor.
  *
- * @param \Nata\ORM\Query $query Query instance
+ * A null query creates a plain result container: rows are returned as
+ * given, with no per-row preparation or hydration. Used for batch-loaded
+ * association results that are already hydrated.
+ *
+ * @param \Nata\ORM\Query|null $query Query instance, or null for prepared results
  * @param array $results Results
  * @return void
  */
-    public function __construct(Query $query, $results) {
+    public function __construct(?Query $query = null, $results = []) {
         $this->_query = $query;
         $this->_results = $results;
     }
