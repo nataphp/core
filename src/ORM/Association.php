@@ -1216,7 +1216,14 @@ class Association extends NataObject {
  * constraints to the whole batch instead of per parent row, which would
  * change results; such queries must run through the per-row path.
  *
- * @param Query $query Target query after the contain builder was applied.
+ * The same applies to result formatters and mapReduce routines (added by
+ * finders such as find('list')/find('threaded'), behaviors or the contain
+ * builder): they would run once over the combined batch instead of once
+ * per parent row, and may reshape rows into values the batch grouping
+ * cannot index by parent key.
+ *
+ * @param Query $query Target query after the contain builder was applied,
+ *   before any internal batch formatter is attached.
  * @return bool True when the query is safe to batch.
  */
     protected function _isBatchableQuery(Query $query) {
@@ -1224,6 +1231,9 @@ class Association extends NataObject {
             return false;
         }
         if ($query->limit() !== null) {
+            return false;
+        }
+        if ($query->formatResults() || $query->mapReduce()) {
             return false;
         }
         return !$query->offset();
