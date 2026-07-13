@@ -23,6 +23,7 @@ use DateTimeZone;
 use DateTime;
 use IntlDateFormatter;
 use Nata\I18n\Time\Interval;
+use Nata\Core\Configure;
 use Nata\I18n\Time\LocalizedDateParser;
 use RuntimeException;
 
@@ -178,6 +179,11 @@ class Time extends DateTime {
 
         if (is_string($timezone)) {
             $timezone = new DateTimeZone($timezone);
+        }
+
+        // If the time is 'now' and the now time is configured, use the configured now time
+        if ($time === 'now' && Configure::read('Time.now') !== null) {
+            $time = Configure::read('Time.now');
         }
 
         parent::__construct($time, $timezone);
