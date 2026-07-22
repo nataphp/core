@@ -586,7 +586,7 @@ class VersionedHistory extends Behavior {
             'foreign_model' => $foreignModel,
             'foreign_id' => $foreignId,
             'version' => $version,
-            'snapshot' => $snapshot,
+            'snapshot' => json_encode($snapshot),
             'url' => $audit['url'],
             'referer' => $audit['referer'],
             'ip_address' => $audit['ip_address'],
