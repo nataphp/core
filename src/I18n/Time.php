@@ -1011,7 +1011,7 @@ class Time extends DateTime {
  * @param \Nata\I18n\Time|string $end End date
  * @return boolean True if current datetime is between given dates
  */
-    public function between(Time|string $start, Time|string $end): bool {
+    public function isBetween(Time|string $start, Time|string $end): bool {
         if (!($start instanceof Time)) {
             $start = new Time($start, $this->timezone());
         }
@@ -1025,6 +1025,13 @@ class Time extends DateTime {
         $now = $this->timestamp();
 
         return $now > $start && $now < $end;
+    }
+
+/**
+ * @deprecated Use Time::isBetween() instead.
+ */
+    public function between(Time|string $start, Time|string $end): bool {
+        return $this->isBetween($start, $end);
     }
 
 /**
