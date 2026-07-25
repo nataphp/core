@@ -1690,8 +1690,6 @@ class Time extends DateTime {
 /**
  * Create \Nata\I18n\Time instance.
  *
- * @param string $time A date/time string.
- *    Valid formats are explained in link reference below
  * @param string|DateTimeZone $timezone Timezone.
  *    If $timezone is omitted, the current timezone will be used.
  * @link https://secure.php.net/manual/en/datetime.formats.php
