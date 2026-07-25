@@ -155,7 +155,7 @@ class Time extends DateTime {
  *    - immutable: (bool) Whether to make this instance immutable
  * @link https://secure.php.net/manual/en/datetime.formats.php
  */
-    public function __construct(string|int|null $time = 'now', string|DateTimeZone $timezone = null, array $options = []) {
+    public function __construct(string|int|null $time = 'now', string|DateTimeZone|null $timezone = null, array $options = []) {
         $options += [
             'locale' => null,
             'calendar' => 'traditional',
@@ -255,23 +255,26 @@ class Time extends DateTime {
     }
 
 /**
- * Get/Set timezone from a string or the user's timezone object.
+ * Get/Set timezone from a string, a DateTimeZone or another Time instance.
  *
- * @param string|DateTimeZone $timezone Timezone string or DateTimeZone object
- *     If null it tries to get timezone from 'Config.timezone' config var
- * @return \Nata\I18n\Time|DateTimeZone Timezone object
+ * The Time case has to be tested first: Time extends DateTime, not DateTimeZone,
+ * so it would otherwise fall into the string branch and hit new DateTimeZone(Time).
+ *
+ * @param string|DateTimeZone|Time $timezone Timezone string, DateTimeZone object,
+ *     or a Time instance to borrow the timezone from.
+ *     If null the current timezone is returned instead.
+ * @return \Nata\I18n\Time|DateTimeZone Timezone object when reading, instance when setting
  */
     public function timezone($timezone = null) {
         if ($timezone === null) {
             return $this->getTimezone();
         }
-        if (!($timezone instanceof DateTimeZone)) {
+        if ($timezone instanceof Time) {
+            $timezone = $timezone->getTimezone();
+        } elseif (!($timezone instanceof DateTimeZone)) {
             $timezone = new DateTimeZone($timezone);
-        } elseif ($timezone instanceof Time) {
-            $timezone = $this->timezone();
         }
-        $this->setTimezone($timezone);
-        return $this;
+        return $this->setTimezone($timezone);
     }
 
 /**
@@ -296,14 +299,22 @@ class Time extends DateTime {
  * - start of year
  * - end of year
  *
+ * When this instance is immutable the modification is applied to a clone, which
+ * is returned still immutable so chained calls keep copying instead of silently
+ * mutating the returned instance.
+ *
  * @param string $modifier The modifier string
- * @return \Nata\I18n\Time|false Modified instance or false if immutable
+ * @return \Nata\I18n\Time|false Modified instance, or false if the modifier is invalid
  */
     public function modify(string $modifier): DateTime|false {
         if ($this->_immutable === true) {
             $clonedInstance = clone $this;
             $clonedInstance->_immutable = false;
-            return $clonedInstance->modify($modifier);
+            if ($clonedInstance->modify($modifier) === false) {
+                return false;
+            }
+            $clonedInstance->_immutable = true;
+            return $clonedInstance;
         }
         $modifier = $this->_modifierMap[$modifier] ?? $modifier;
         return parent::modify($modifier);
@@ -311,7 +322,7 @@ class Time extends DateTime {
 
 /**
  * Sets the date.
- * If immutable, returns a new instance with the date set.
+ * If immutable, returns a new immutable instance with the date set.
  *
  * @param int $year Year.
  * @param int $month Month.
@@ -322,14 +333,16 @@ class Time extends DateTime {
         if ($this->_immutable) {
             $clonedInstance = clone $this;
             $clonedInstance->_immutable = false;
-            return $clonedInstance->setDate($year, $month, $day);
+            $clonedInstance->setDate($year, $month, $day);
+            $clonedInstance->_immutable = true;
+            return $clonedInstance;
         }
         return parent::setDate($year, $month, $day);
     }
 
 /**
  * Sets the time.
- * If immutable, returns a new instance with the time set.
+ * If immutable, returns a new immutable instance with the time set.
  *
  * @param int $hour Hour.
  * @param int $minute Minute.
@@ -341,14 +354,16 @@ class Time extends DateTime {
         if ($this->_immutable) {
             $clonedInstance = clone $this;
             $clonedInstance->_immutable = false;
-            return $clonedInstance->setTime($hour, $minute, $second, $microsecond);
+            $clonedInstance->setTime($hour, $minute, $second, $microsecond);
+            $clonedInstance->_immutable = true;
+            return $clonedInstance;
         }
         return parent::setTime($hour, $minute, $second, $microsecond);
     }
 
 /**
  * Sets the Unix timestamp.
- * If immutable, returns a new instance with the timestamp set.
+ * If immutable, returns a new immutable instance with the timestamp set.
  *
  * @param int $timestamp Unix timestamp.
  * @return static
@@ -357,14 +372,16 @@ class Time extends DateTime {
         if ($this->_immutable) {
             $clonedInstance = clone $this;
             $clonedInstance->_immutable = false;
-            return $clonedInstance->setTimestamp($timestamp);
+            $clonedInstance->setTimestamp($timestamp);
+            $clonedInstance->_immutable = true;
+            return $clonedInstance;
         }
         return parent::setTimestamp($timestamp);
     }
 
 /**
  * Sets the timezone.
- * If immutable, returns a new instance with the timezone set.
+ * If immutable, returns a new immutable instance with the timezone set.
  *
  * @param \DateTimeZone $timezone Timezone.
  * @return static
@@ -373,14 +390,16 @@ class Time extends DateTime {
         if ($this->_immutable) {
             $clonedInstance = clone $this;
             $clonedInstance->_immutable = false;
-            return $clonedInstance->setTimezone($timezone);
+            $clonedInstance->setTimezone($timezone);
+            $clonedInstance->_immutable = true;
+            return $clonedInstance;
         }
         return parent::setTimezone($timezone);
     }
 
 /**
  * Sets the ISO date.
- * If immutable, returns a new instance with the ISO date set.
+ * If immutable, returns a new immutable instance with the ISO date set.
  *
  * @param int $year Year.
  * @param int $week ISO week number.
@@ -391,7 +410,9 @@ class Time extends DateTime {
         if ($this->_immutable) {
             $clonedInstance = clone $this;
             $clonedInstance->_immutable = false;
-            return $clonedInstance->setISODate($year, $week, $dayOfWeek);
+            $clonedInstance->setISODate($year, $week, $dayOfWeek);
+            $clonedInstance->_immutable = true;
+            return $clonedInstance;
         }
         return parent::setISODate($year, $week, $dayOfWeek);
     }
@@ -400,14 +421,13 @@ class Time extends DateTime {
  * Get/Set timestamp.
  *
  * @param int $timestamp Timestamp.
- * @return int Timestamp
+ * @return int|static Timestamp when reading, instance when setting
  */
     public function timestamp($timestamp = null) {
         if ($timestamp === null) {
             return $this->getTimestamp();
         }
-        $this->setTimestamp($timestamp);
-        return $this;
+        return $this->setTimestamp($timestamp);
     }
 
 /**
@@ -415,16 +435,23 @@ class Time extends DateTime {
  * This function also accepts a time string and a format string as first and second parameters.
  * In that case this function behaves as a wrapper for Time::i18nFormat()
  *
+ * Only an empty result falls back to $default. A falsy but meaningful result
+ * such as the '0' of format('L') on a non-leap year is returned as-is.
+ *
  * @param string $format date format string
  * @param boolean|string $default if an invalid date is passed it will output supplied default value.
  *      Pass false if you want raw conversion value
+ * @param string|null $locale Unused, kept for signature compatibility.
  * @return string Formatted date string
  * @link https://secure.php.net/manual/en/datetime.format.php
  * @link https://secure.php.net/manual/en/function.date.php
  */
-    public function format($format, $default = false, string $locale = null): string {
+    public function format($format, $default = false, ?string $locale = null): string {
         $date = parent::format($format);
-        return ($date ? $date : $default);
+        if ($date === '') {
+            return (string) $default;
+        }
+        return $date;
     }
 
 /**
@@ -1078,13 +1105,20 @@ class Time extends DateTime {
 /**
  * Evaluates if the provided hour is within a time span.
  *
+ * The span is half-open: $after is included, $before is not. When $after is
+ * greater than $before the span wraps past midnight (21 to 5 means 21:00-04:59),
+ * so the two ends are tested separately.
+ *
  * @param int $after After hour used for comparison
  * @param int $before Before hour used for comparison
  * @return boolean True if given datetime is after hour is before the hour
  */
     protected function _isWithinHourSpan($after, $before): bool {
-        $hour = $this->format('G');
-        return $hour >= $after && $hour < $before;
+        $hour = (int) $this->format('G');
+        if ($after <= $before) {
+            return $hour >= $after && $hour < $before;
+        }
+        return $hour >= $after || $hour < $before;
     }
 
 /**
@@ -1164,7 +1198,9 @@ class Time extends DateTime {
  * @return int|array Quarter number (1-4) or array with dates
  */
     public function quarter(bool $withDates = false) {
-        $quarter = ceil($this->format('m') / 3);
+        // Cast is required: ceil() returns a float and match() compares with ===,
+        // so a float would miss every arm below.
+        $quarter = (int) ceil($this->format('m') / 3);
 
         if (!$withDates) {
             return $quarter;
@@ -1622,16 +1658,6 @@ class Time extends DateTime {
  */
     public function __toString() {
         return $this->format('c');
-    }
-
-/**
- * __clone.
- *
- * @return Time
- */
-    public function __clone() {
-        $time = $this;
-        return $time;
     }
 
 /**
