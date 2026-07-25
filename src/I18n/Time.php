@@ -1005,13 +1005,27 @@ class Time extends DateTime {
     }
 
 /**
- * Returns true if $start and $end dates are between current datetime.
+ * Returns true if this instance falls between the given start and end dates.
  *
- * @param \Nata\I18n\Time|string $start Start date
- * @param \Nata\I18n\Time|string $end End date
- * @return boolean True if current datetime is between given dates
+ * The range is half-open by default: the start boundary is included and the
+ * end boundary is excluded, so consecutive ranges tile without gaps or
+ * overlaps. Pass $inclusiveEnd to include the end boundary instead, which is
+ * what date-only ranges usually want (an end date parses to midnight, so the
+ * end day would otherwise be excluded entirely).
+ *
+ * Integer arguments are accepted as UNIX timestamps. They must not be left to
+ * the string coercion of the parameter type, since the constructor only
+ * prefixes '@' for real integers and would otherwise misparse the digits as a
+ * date.
+ *
+ * Returns false when $start is after $end.
+ *
+ * @param \Nata\I18n\Time|string|int $start Start of the range.
+ * @param \Nata\I18n\Time|string|int $end End of the range.
+ * @param bool $inclusiveEnd Whether the end boundary counts as inside the range.
+ * @return bool True if this instance is within the range
  */
-    public function isBetween(Time|string $start, Time|string $end): bool {
+    public function isBetween(Time|string|int $start, Time|string|int $end, bool $inclusiveEnd = false): bool {
         if (!($start instanceof Time)) {
             $start = new Time($start, $this->timezone());
         }
@@ -1020,18 +1034,25 @@ class Time extends DateTime {
             $end = new Time($end, $this->timezone());
         }
 
-        $start = $start->timestamp();
-        $end = $end->timestamp();
-        $now = $this->timestamp();
+        $startTimestamp = $start->timestamp();
+        $endTimestamp = $end->timestamp();
+        $timestamp = $this->timestamp();
 
-        return $now > $start && $now < $end;
+        if ($timestamp < $startTimestamp) {
+            return false;
+        }
+
+        if ($inclusiveEnd) {
+            return $timestamp <= $endTimestamp;
+        }
+        return $timestamp < $endTimestamp;
     }
 
 /**
  * @deprecated Use Time::isBetween() instead.
  */
-    public function between(Time|string $start, Time|string $end): bool {
-        return $this->isBetween($start, $end);
+    public function between(Time|string|int $start, Time|string|int $end, bool $inclusiveEnd = false): bool {
+        return $this->isBetween($start, $end, $inclusiveEnd);
     }
 
 /**
