@@ -8,14 +8,43 @@
 
 namespace Nata\View\Smarty;
 
+use DateTimeInterface;
+use DateTimeZone;
 use Nata\View\CellBuilder;
 use Nata\I18n\I18n;
+use Nata\I18n\Time;
 use Smarty\Smarty;
 use Smarty\Template;
 
 final class Plugins {
 
     public static function register(Smarty $smarty): void {
+        // -- localized date/time: {$date|intl_format:'d MMM y'}
+        //
+        // Smarty's own date_format is strftime-based and locale-blind, so it
+        // always renders month and weekday names in English. This delegates to
+        // Time::intlFormat(), which formats through IntlDateFormatter using the
+        // active I18n locale, and accepts the same value types date_format does
+        // (Time/DateTime instances, timestamps, and parseable date strings).
+        $smarty->registerPlugin(Smarty::PLUGIN_MODIFIER, 'intl_format', function ($value, string $format = 'long,short', string $default = ''): string {
+            if ($value === null || $value === '') {
+                return $default;
+            }
+
+            if (!$value instanceof Time) {
+                if ($value instanceof DateTimeInterface) {
+                    $value = new Time($value->format('Y-m-d H:i:s'), $value->getTimezone());
+                } elseif (is_int($value) || ctype_digit((string)$value)) {
+                    $value = new Time('@' . (int)$value);
+                    $value->setTimezone(new DateTimeZone(date_default_timezone_get()));
+                } else {
+                    $value = new Time((string)$value);
+                }
+            }
+
+            return (string)$value->intlFormat($format);
+        });
+
         // -- simple: {'msg'|__}
         $smarty->registerPlugin(Smarty::PLUGIN_MODIFIER, '__', function (string $string, ...$args): string {
             if (!$string) return '';
