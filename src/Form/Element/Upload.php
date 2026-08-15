@@ -1285,14 +1285,24 @@ class Upload extends Element {
             $merged['path'] = $path;
             $merged['store'] = $postedStore;
             $merged['mime'] = $file->mime();
-            $merged['size'] = $file->size();
             if ($file->is('image') && $file->isRaster()) {
                 $merged['width'] = $file->width();
                 $merged['height'] = $file->height();
             } elseif ($file->is('video') && $file->width() > 0) {
                 $merged['width'] = $file->width();
                 $merged['height'] = $file->height();
+
+                // Move the moov atom to the front (MP4 faststart) so the video can
+                // stream from a small range request instead of forcing the browser
+                // to download most of the file before playback. No-op when ffmpeg is
+                // unavailable or the container is not MP4/QuickTime.
+                // Done here, on the tmp file, rather than after the move: the move
+                // is a full copy either way, and afterValidation() is skipped when
+                // importToRepositoryOnSubmittion() is off.
+                $file->fixMoovFlags();
             }
+            // Read after the faststart remux: it rewrites the file in place.
+            $merged['size'] = $file->size();
             $out[] = $merged;
         }
         return $out;
