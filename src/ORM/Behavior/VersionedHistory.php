@@ -276,9 +276,16 @@ class VersionedHistory extends Behavior {
             return [];
         }
 
-        $rows = $translationTable->find()
-            ->where([$foreignKey => $entityId])
-            ->all();
+        $query = $translationTable->find()
+            ->where([$foreignKey => $entityId]);
+
+        // Snapshot canonical translations only. The snapshot is keyed by locale and field, so
+        // a context variant would collapse onto the neutral value and be restored as canonical
+        if ($translationTable->hasField('context')) {
+            $query->andWhere(['context' => Translate::NEUTRAL_CONTEXT]);
+        }
+
+        $rows = $query->all();
 
         $result = [];
         foreach ($rows as $row) {
@@ -474,18 +481,35 @@ class VersionedHistory extends Behavior {
         if (empty($entityId)) {
             return;
         }
-        $translationTable->deleteAll([$foreignKey => $entityId]);
+        $hasContext = $translationTable->hasField('context');
+
+        // Context variants are outside the snapshot, so they must survive the wipe rather than
+        // be deleted as collateral of restoring the canonical translations
+        $deleteConditions = [$foreignKey => $entityId];
+        if ($hasContext) {
+            $deleteConditions['context'] = Translate::NEUTRAL_CONTEXT;
+        }
+
+        $translationTable->deleteAll($deleteConditions);
         foreach ($i18n as $locale => $fields) {
             if (!is_array($fields)) {
                 continue;
             }
             foreach ($fields as $field => $content) {
-                $translationTable->save($translationTable->newEntity([
+                $row = [
                     $foreignKey => $entityId,
                     'locale' => $locale,
                     'field' => $field,
                     'content' => $content,
-                ]));
+                ];
+
+                // Written straight to the table rather than through Translate::beforeSave, so
+                // the neutral context has to be set here for the unique index to match
+                if ($hasContext) {
+                    $row['context'] = Translate::NEUTRAL_CONTEXT;
+                }
+
+                $translationTable->save($translationTable->newEntity($row));
             }
         }
     }

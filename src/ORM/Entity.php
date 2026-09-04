@@ -20,6 +20,7 @@ namespace Nata\ORM;
 use Nata\Core\NataObject;
 use Nata\Utility\Inflector;
 use Nata\Collection\Collection;
+use Nata\ORM\Behavior\Translate;
 use JsonSerializable;
 use ArrayAccess;
 use InvalidArgumentException;
@@ -494,6 +495,14 @@ class Entity extends NataObject implements JsonSerializable, ArrayAccess {
 
             $className = static::class;
             foreach ($translations as $translation) {
+                // Context variants are not canonical translations. Letting one in here would
+                // overwrite the neutral value and see it written back as the canonical one.
+                // A null means the table has no context column, so nothing is filtered.
+                $context = $translation->get('context');
+                if ($context !== null && $context !== Translate::NEUTRAL_CONTEXT) {
+                    continue;
+                }
+
                 $locale = $translation->get('locale');
                 $field = $translation->get('field');
                 if (!isset($i18n[$locale])) {
@@ -527,6 +536,36 @@ class Entity extends NataObject implements JsonSerializable, ArrayAccess {
         $this->dirty('_translations', true);
 
         return $i18n[$language];
+    }
+
+/**
+ * Get a translated field resolved against the runtime facts the caller knows about.
+ *
+ * The context bag carries whatever the caller happens to know - the gender of the person a
+ * label refers to, for instance - and the stored data decides whether anything varies on it.
+ * The canonical translation is returned whenever the entity has no translation support, the
+ * translation table has no context column, or nothing matches, so this is safe to call on
+ * any entity and stays a no-op until variants are actually authored.
+ *
+ * @param string $field Translated field name.
+ * @param string|array $context Context bag: an "axis:value" token, a list of tokens, or an axis => value map.
+ * @return mixed Variant content when one matches, otherwise the canonical field value.
+ */
+    public function translated(string $field, $context = []) {
+        $value = $this->get($field);
+
+        if (empty($context) || !$this->source()) {
+            return $value;
+        }
+
+        $table = $this->loadModel($this->source());
+        if (!$table->hasBehavior('Translate')) {
+            return $value;
+        }
+
+        $variant = $table->translatedField($this, $field, $context);
+
+        return $variant === null ? $value : $variant;
     }
 
 /**

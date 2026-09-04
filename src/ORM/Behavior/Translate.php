@@ -36,6 +36,17 @@ use Nata\Utility\Inflector;
 class Translate extends Behavior {
 
 /**
+ * Context value marking the canonical, context-free translation of a field.
+ *
+ * It must never be an empty string: Table::_getExistsConditions() replaces any empty
+ * unique-index column with a placeholder that matches no row, which would make the ORM
+ * treat every existing translation as new and insert a duplicate key.
+ *
+ * @var string
+ */
+    const NEUTRAL_CONTEXT = 'default';
+
+/**
  * Locale.
  *
  * @var string
@@ -78,6 +89,16 @@ class Translate extends Behavior {
     protected static $_localeList = [];
 
 /**
+ * Loaded context variants, memoized per request as [locale][field][context] => content.
+ *
+ * Keyed by locale because I18n::locale() can change mid request while this behavior
+ * instance lives on the TableRegistry singleton for the whole request.
+ *
+ * @var array
+ */
+    private $_variants = [];
+
+/**
  * Default config.
  * These are merged with user-provided configuration when the behavior is used.
  *
@@ -89,7 +110,7 @@ class Translate extends Behavior {
         ],
         'implementedMethods' => [
             'locale' => 'locale',
-            'translationField' => 'translationField',
+            'translatedField' => 'translatedField',
             'translationTable' => 'translationTable'
         ],
         'defaultLocale' => null,
@@ -99,6 +120,8 @@ class Translate extends Behavior {
         'allowEmptyTranslations' => false,
         'foreignKey' => null,
         'foreignModelColumn' => null,
+        'contextPrecedence' => [],
+        'contextEagerLoad' => false,
     ];
 
 
@@ -233,6 +256,11 @@ class Translate extends Behavior {
 
         $where = $translationTable->aliasField($foreignKey) . ' = ' . $query->aliasField('id', $this->_table->table());
         $where .= " AND " . $translationTable->aliasField('field') . " = '{$field}'";
+
+        // Never let a context variant win the LIMIT 1 and become the canonical value
+        if ($translationTable->hasField('context')) {
+            $where .= " AND " . $translationTable->aliasField('context') . " = '" . static::NEUTRAL_CONTEXT . "'";
+        }
 
         // Locale conditions
         $whereLocales = [];
@@ -395,6 +423,7 @@ class Translate extends Behavior {
         $polymorphic = $this->config('polymorphic');
         $foreignKey = $this->foreignKey();
         $foreignModelColumn = $this->foreignModelColumn();
+        $hasContext = $translationTable->hasField('context');
         foreach ($langs as $lang) {
             if ($lang === $locale) {
                 continue;
@@ -415,7 +444,17 @@ class Translate extends Behavior {
                     'locale' => $lang,
                     'field' => $field,
                     'content' => $translation->get($field)
-                ] + $extraData;
+                ];
+
+                // The ORM derives INSERT vs UPDATE from the unique indexes and treats an empty
+                // column as missing, so the neutral context has to be written explicitly instead
+                // of being left to the column default. It is set before merging $extraData so a
+                // stray context carried there cannot retag this row as a variant.
+                if ($hasContext) {
+                    $data['context'] = static::NEUTRAL_CONTEXT;
+                }
+
+                $data += $extraData;
 
                 if ($polymorphic) {
                     $data[$foreignKey] = $entity->get('id');
@@ -500,5 +539,234 @@ class Translate extends Behavior {
             $this->_foreignModelColumn = 'foreign_model';
         }
         return $this->_foreignModelColumn;
+    }
+
+/**
+ * Resolve a context variant of a translated field.
+ *
+ * Context variants let one field carry more than one translation per locale, chosen at
+ * render time from facts the caller knows: the gender of the person a role name refers to,
+ * the formality of a channel, the space available. Variants are keyed by an opaque
+ * namespaced selector ("gender:female"), so the set of variants belongs to the stored data
+ * rather than to the schema, and a translator can add a form the developer never anticipated.
+ *
+ * Returns null whenever nothing matches, so the caller keeps the canonical translation the
+ * main query already loaded. Unknown facts are dropped by _normalizeContext() and therefore
+ * resolve to the canonical value with no special casing at the call site.
+ *
+ * @param \Nata\ORM\Entity $entity Entity owning the translation.
+ * @param string $field Translated field name.
+ * @param string|array $context Context bag: an "axis:value" token, a list of tokens, or an axis => value map.
+ * @return string|null Variant content, or null when there is no matching variant.
+ */
+    public function translatedField(Entity $entity, $field, $context = []) {
+        $translationTable = $this->translationTable();
+        if (!$translationTable->hasField('context')) {
+            return null;
+        }
+
+        if (!in_array($field, (array)$this->config('fields'), true)) {
+            return null;
+        }
+
+        $entityId = $entity->get('id');
+        if (empty($entityId)) {
+            return null;
+        }
+
+        $normalizedContext = $this->_normalizeContext($context);
+        if (!$normalizedContext) {
+            return null;
+        }
+
+        $variants = $this->_loadVariants($field, $entityId);
+        if (empty($variants[$entityId])) {
+            return null;
+        }
+
+        foreach ($this->_contextKeys($normalizedContext) as $contextKey) {
+            if (isset($variants[$entityId][$contextKey])) {
+                return $variants[$entityId][$contextKey];
+            }
+        }
+
+        return null;
+    }
+
+/**
+ * Normalize a context argument into an axis => value map.
+ *
+ * Accepts a single "axis:value" token, a list of such tokens, or an axis => value map, so a
+ * literal reads compactly while a dynamic value can be passed without building a string.
+ * Axes resolving to an empty value are dropped: an unknown fact must fall through to the
+ * canonical translation rather than match nothing.
+ *
+ * @param string|array $context Context bag in any accepted shape.
+ * @return array Axis => value map.
+ */
+    private function _normalizeContext($context) {
+        if (is_string($context)) {
+            $context = [$context];
+        }
+
+        $normalized = [];
+        foreach ((array)$context as $axis => $value) {
+            if (is_int($axis)) {
+                if (!is_string($value) || !str_contains($value, ':')) {
+                    continue;
+                }
+                [$axis, $value] = explode(':', $value, 2);
+            }
+
+            $axis = trim((string)$axis);
+            $value = trim((string)$value);
+            if ($axis === '' || $value === '') {
+                continue;
+            }
+
+            // ':' separates axis from value and '|' joins axes, so neither can appear inside one
+            if (str_contains($axis, ':') || str_contains($axis, '|') || str_contains($value, ':') || str_contains($value, '|')) {
+                continue;
+            }
+
+            $normalized[$axis] = $value;
+        }
+
+        return $normalized;
+    }
+
+/**
+ * Build the context keys to look for, most specific first.
+ *
+ * Axes are ordered by the configured precedence before being joined, so a composite key
+ * always has the same shape as the stored one no matter what order the caller filled the
+ * context bag in. Combinations are tried before single axes because a variant written for
+ * two axes at once is more specific than either of them alone.
+ *
+ * @param array $normalizedContext Axis => value map.
+ * @return array Context keys in lookup order.
+ */
+    private function _contextKeys(array $normalizedContext) {
+        $precedence = (array)$this->config('contextPrecedence');
+        $axes = array_keys($normalizedContext);
+
+        $orderedAxes = array_values(array_intersect($precedence, $axes));
+        foreach ($axes as $axis) {
+            if (!in_array($axis, $orderedAxes, true)) {
+                $orderedAxes[] = $axis;
+            }
+        }
+
+        $singleKeys = [];
+        foreach ($orderedAxes as $axis) {
+            $singleKeys[] = $axis . ':' . $normalizedContext[$axis];
+        }
+
+        $keys = [];
+        if (count($singleKeys) > 1) {
+            $keys[] = implode('|', $singleKeys);
+        }
+
+        return array_merge($keys, $singleKeys);
+    }
+
+/**
+ * Load the context variants of a field, memoized for the request.
+ *
+ * Variant rows are sparse - one exists only where somebody authored it - so a small table
+ * can afford to load its whole variant set once and serve every entity from memory. That is
+ * opt-in through the contextEagerLoad config: on a large table the same strategy would pull
+ * the entire set, so the default queries a single entity instead.
+ *
+ * @param string $field Translated field name.
+ * @param mixed $entityId Primary key of the entity being resolved.
+ * @return array Map of entity id => [context key => content].
+ */
+    private function _loadVariants($field, $entityId) {
+        $locale = (string)I18n::locale();
+        $eagerLoad = (bool)$this->config('contextEagerLoad');
+        $memoKey = $eagerLoad ? '*' : $entityId;
+
+        if (isset($this->_variants[$locale][$field][$memoKey])) {
+            return $this->_variants[$locale][$field][$memoKey];
+        }
+
+        $translationTable = $this->translationTable();
+        $foreignKey = $this->foreignKey();
+
+        $conditions = [
+            'field' => $field,
+            'context <>' => static::NEUTRAL_CONTEXT,
+            'locale IN' => $this->_variantLocales()
+        ];
+
+        // A polymorphic translation table serves several models, so the owning model has to
+        // be part of the lookup or another model's rows leak in
+        if ($this->config('polymorphic')) {
+            $conditions[$this->foreignModelColumn()] = $this->_table->registryAlias();
+        }
+
+        if (!$eagerLoad) {
+            $conditions[$foreignKey] = $entityId;
+        }
+
+        $query = $translationTable->find()
+            ->select([$foreignKey, 'context', 'content'])
+            ->where($conditions)
+            ->orderByField($translationTable->aliasField('locale'), $this->_variantLocales());
+
+        $variants = [];
+        foreach ($query as $row) {
+            $content = $row->get('content');
+            if ($content === null || trim((string)$content) === '') {
+                continue;
+            }
+
+            $rowId = $row->get($foreignKey);
+            $rowContext = (string)$row->get('context');
+
+            // Rows arrive in locale preference order, so the first hit for a context wins
+            if (!isset($variants[$rowId][$rowContext])) {
+                $variants[$rowId][$rowContext] = $content;
+            }
+        }
+
+        $this->_variants[$locale][$field][$memoKey] = $variants;
+
+        return $variants;
+    }
+
+/**
+ * Build the locale preference list used to resolve variants, most preferred first.
+ *
+ * Deliberately independent of _getLocalesList() and locale(): both memoize - the first into
+ * a process-wide static - and go stale when I18n::locale() is changed mid request.
+ *
+ * @return array Locale codes, most preferred first.
+ */
+    private function _variantLocales() {
+        $locales = [];
+
+        $userLocale = (string)I18n::locale();
+        if ($userLocale !== '') {
+            $locales[] = $userLocale;
+        }
+
+        $defaultLocale = (string)$this->config('defaultLocale');
+        if ($defaultLocale !== '') {
+            $locales[] = $defaultLocale;
+        }
+
+        if (str_contains($userLocale, '-')) {
+            [$baseLanguage] = explode('-', $userLocale);
+            $locales[] = $baseLanguage;
+        }
+
+        $sourceLocale = (string)I18n::sourceLocale();
+        if ($sourceLocale !== '') {
+            $locales[] = $sourceLocale;
+        }
+
+        return array_values(array_unique($locales));
     }
 }

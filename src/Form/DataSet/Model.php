@@ -21,6 +21,7 @@ use Nata\Form\DataSet;
 use Nata\ORM\Query;
 use Nata\ORM\Entity;
 use Nata\ORM\TableRegistry;
+use Nata\ORM\Behavior\Translate;
 use Nata\Collection\Collection;
 
 /**
@@ -164,12 +165,19 @@ class Model extends DataSet {
                         }
                     }
 
-                    $translations = $translateBehavior->translationTable()
+                    $translationTable = $translateBehavior->translationTable();
+                    $translations = $translationTable
                         ->find()
                         ->select(['locale', 'field', 'content'])
                         ->andWhere([
                             $translateBehavior->foreignKey() => $this->_primaryKey
                         ]);
+
+                    // Only canonical rows may reach the form: a context variant shown here
+                    // would be saved back over the neutral translation
+                    if ($translationTable->hasField('context')) {
+                        $translations->andWhere(['context' => Translate::NEUTRAL_CONTEXT]);
+                    }
 
                     foreach ($translations as $translation) {
                         $field = $translation->get('field');
