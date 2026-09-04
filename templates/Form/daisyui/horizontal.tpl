@@ -1,4 +1,5 @@
-<div class="flex flex-col gap-4 mb-4 {$element->attrs()->id()}{if $element->hasError()} text-error{/if} sm:flex-row sm:items-baseline">
+{* `form-group` is the hook showwhen.js toggles -- see default.tpl. *}
+<div class="form-group flex flex-col gap-4 mb-4 {$element->attrs()->id()}{if $element->hasError()} text-error{/if} sm:flex-row sm:items-baseline">
     {block name='label'}
         {if $element->label()}
             <label for="{$element->attrs()->id()}" class="label sm:w-1/4 shrink-0">

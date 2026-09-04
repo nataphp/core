@@ -112,6 +112,18 @@ const submit = {
                     console.warn('Nata form: empty response from server');
                     return null;
                 }
+                /*
+                 * Controller::redirect() answers an AJAX request with 201 and
+                 * puts the destination in the Nata-Location HEADER, not in the
+                 * body -- which is what nata.js has always read. Reading only
+                 * the body meant a form that saved and redirected left the page
+                 * exactly where it was, with nothing to tell the person who
+                 * pressed the button that anything had happened.
+                 */
+                const location = response.headers.get('nata-location');
+                if (location) {
+                    return {redirect: location};
+                }
                 return response.text().then(text => {
                     if (!text || text.length === 0) {
                         console.warn('Nata form: empty response from server');
@@ -325,14 +337,19 @@ function _appendNestedValue(target, tokens, value) {
         }
 
         if (isLast) {
-            if (Object.prototype.hasOwnProperty.call(cursor, token)) {
-                if (!Array.isArray(cursor[token])) {
-                    cursor[token] = [cursor[token]];
-                }
-                cursor[token].push(value);
-            } else {
-                cursor[token] = value;
-            }
+            /*
+             * Last one wins, which is what PHP does with a repeated key that
+             * has no [] on it. Collecting duplicates into an array instead
+             * broke the framework's own checkbox: the themes render it as a
+             * hidden companion carrying 0 followed by the box carrying 1, so
+             * an ordinary checked checkbox arrived as ["0","1"] and every
+             * scalar field behind it -- an integer column, most visibly --
+             * received an array it had no way to read.
+             *
+             * A field that genuinely collects several values is named with [],
+             * and that is handled by the empty-token branch above.
+             */
+            cursor[token] = value;
             return;
         }
 

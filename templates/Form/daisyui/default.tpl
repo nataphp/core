@@ -1,4 +1,11 @@
-<div class="w-full mb-4 {$element->attrs()->id()}{if $element->hasError()} nata-field--invalid{/if}">
+{*
+ * `form-group` is what showwhen.js looks for: it toggles
+ * dependentEl.closest('.form-group'), and silently does nothing when there is
+ * no such ancestor. The bootstrap themes carry the class, this one never did,
+ * which is why showWhen/hideWhen were inert on daisyui. Nothing styles it here
+ * -- the only .form-group rules in nata.form.css target chosen containers.
+ *}
+<div class="form-group w-full mb-4 {$element->attrs()->id()}{if $element->hasError()} nata-field--invalid{/if}">
     {block name='label'}
         {if $element->label()}
             <label for="{$element->attrs()->id()}" class="label">

@@ -211,12 +211,22 @@ class ElementValue {
             return $value;
         }
 
-        if ($this->_type === 'integer' && strlen($value) === 0) {
+        $type = gettype($value);
+
+        /*
+         * Nothing is cast into or out of a composite. Checked BEFORE the
+         * integer test below, which calls strlen() and therefore raises a
+         * TypeError on an array rather than falling through to here.
+         */
+        if (in_array($type, ['array', 'object'])) {
+            return $value;
+        }
+
+        if ($this->_type === 'integer' && strlen((string)$value) === 0) {
             return null;
         }
 
-        $type = gettype($value);
-        if (in_array($type, ['array', 'object']) || $type === $this->_type) {
+        if ($type === $this->_type) {
             return $value;
         }
 

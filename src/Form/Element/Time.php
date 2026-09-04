@@ -51,7 +51,13 @@ class Time extends BaseTime {
  */
     public function beforeRender($event) {
         $this->_getView()->extend(array('input'));
-		if ($this->value() !== null) {
+		/*
+		 * An empty value stays empty. strtotime('') is false and date() reads
+		 * that as the epoch, so coercing it produced 00:00 -- which means an
+		 * optional time field could never actually be left blank, and "no time"
+		 * was indistinguishable from midnight.
+		 */
+		if ($this->value() !== null && trim((string)$this->_value) !== '') {
 			$this->_value = date($this->_format, strtotime($this->_value));
 		}
         parent::beforeRender($event);

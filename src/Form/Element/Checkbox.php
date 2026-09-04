@@ -60,6 +60,24 @@ class Checkbox extends Element {
 
         // This is required until ORM can save 'null' value
         if ($this->_data->submitted()) {
+            /*
+             * A single checkbox is rendered as a hidden companion carrying 0
+             * followed by the box itself carrying 1, so a client that collects
+             * repeated keys into an array -- which is what nata.form.js did
+             * before the fix in _appendNestedValue(), and what a browser still
+             * holding that bundle in cache keeps doing -- submits both.
+             *
+             * Collapsed HERE, on the request, rather than only where it is read:
+             * the value goes on to be validated and saved, and an array reaching
+             * an integer column is a write nobody can make sense of. The last
+             * one is the state of the box, which is what PHP would itself have
+             * kept from a plain form post.
+             */
+            $submitted = $this->_data->request();
+            if (!$this->_multiple && is_array($submitted)) {
+                $this->_data->request($submitted === [] ? '' : end($submitted));
+            }
+
             $value = $this->value();
 
             if ($this->isEmpty($value) && !$this->_multiple) {
@@ -82,7 +100,13 @@ class Checkbox extends Element {
         }
 
         if (!$this->_multiple) {
-            $data = trim($data);
+            // Composites are collapsed on the request in initialize(); this
+            // only has to survive one arriving from somewhere else.
+            if (is_array($data)) {
+                $data = $data === [] ? '' : end($data);
+            }
+
+            $data = trim((string)$data);
         }
 
         return parent::isEmpty($data);
