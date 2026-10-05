@@ -342,7 +342,11 @@ class AwsS3 extends Adapter {
  */
     protected function _getContentDisposition(string $key, array $options): string {
         $type = $options['download'] ? 'attachment' : 'inline';
-        return $type . '; filename="' . $options['name'] ?? pathinfo($key, PATHINFO_BASENAME) . '"';
+        $name = $options['name'] ?? pathinfo($key, PATHINFO_BASENAME);
+        // Quotes and line breaks would break out of the quoted filename.
+        $name = str_replace(['"', '\\', "\r", "\n"], ['', '', '', ''], (string)$name);
+
+        return $type . '; filename="' . $name . '"';
     }
 
 /**

@@ -164,11 +164,10 @@ class GenerateI18nJs extends Command {
             }
 
             $category = $locales[$locale];
-            unset($category['LC_MESSAGES']['_reversei18n']);
-            $domains[$domain] = $category;
             if (isset($category['LC_MESSAGES']['__lmf__'])) {
                 $domainModified = $category['LC_MESSAGES']['__lmf__'];
             }
+            $domains[$domain] = $this->_toJsCategories($category);
 
             if ($domainModified > $modified) {
                 $io->out('');
@@ -190,8 +189,6 @@ class GenerateI18nJs extends Command {
             return 'skipped';
         }
 
-        unset($domains['LC_MESSAGES']['__lmf__']);
-
         // Generate file contents
         // Namespace by language code to allow multiple languages to coexist
         $contents = "if(typeof i18n==='undefined')i18n={};i18n['" . $locale . "']=" . json_encode($domains) . ";";
@@ -208,6 +205,33 @@ class GenerateI18nJs extends Command {
 
         I18n::locale($originalLocale);
         return true;
+    }
+
+/**
+ * Convert the I18n catalogue of a domain to the structure read by i18n.js.
+ *
+ * The PHP catalogue keeps messages without context under "msgctxt_" and
+ * internal keys (last modification "__lmf__", "_reversei18n"); i18n.js looks
+ * messages up directly in the category and only uses "msgctxt_{context}"
+ * when a context is given.
+ *
+ * @param array $categories Categories of the domain (e.g. LC_MESSAGES => messages)
+ * @return array Categories for JavaScript
+ */
+    protected function _toJsCategories(array $categories): array {
+        foreach ($categories as $name => $messages) {
+            if (!is_array($messages)) {
+                continue;
+            }
+            unset($messages['__lmf__'], $messages['_reversei18n']);
+            if (isset($messages['msgctxt_']) && is_array($messages['msgctxt_'])) {
+                $messages = $messages['msgctxt_'] + $messages;
+                unset($messages['msgctxt_']);
+            }
+            $categories[$name] = $messages;
+        }
+
+        return $categories;
     }
 
 /**

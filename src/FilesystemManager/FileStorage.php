@@ -233,7 +233,7 @@ class FileStorage {
         // Check free space
         $freeSpace = $adapter->freeSpace();
         if ($freeSpace !== null && $size > $freeSpace) {
-            static::_setError(__('Not enough free space to store file "%s" in "%s".', $path, $adapter->getStoreName()));
+            static::_setError(__('Not enough free space to store file "%s" in "%s".', [$path, $adapter->getStoreName()]));
             return false;
         }
 

@@ -205,7 +205,11 @@ class Local extends Adapter {
  * @return int|null Size in bytes or null on failure
  */
     public function freeSpace(): ?int {
-        return disk_free_space($this->_getBasePath());
+        // The root may not exist yet (it is created on the first put): unknown, not zero.
+        $basePath = $this->_getBasePath();
+        $freeSpace = is_dir($basePath) ? @disk_free_space($basePath) : false;
+
+        return $freeSpace === false ? null : (int)$freeSpace;
     }
 
 /**
@@ -267,7 +271,11 @@ class Local extends Adapter {
         if (is_dir($path)) {
             return;
         }
-        mkdir($path);
+        // Recursive: the store root itself may not exist yet. The second is_dir()
+        // covers a concurrent request creating it in between.
+        if (!mkdir($path, 0775, true) && !is_dir($path)) {
+            $this->_setError(sprintf("Unable to create directory '%s'.", $path));
+        }
     }
 
 /**
