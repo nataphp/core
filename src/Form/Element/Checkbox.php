@@ -107,9 +107,31 @@ class Checkbox extends Element {
             }
 
             $data = trim((string)$data);
+
+            // An unchecked single checkbox still posts its hidden "0" (see the
+            // element templates): that is no answer, unless "0" is a real option.
+            if ($data === '0' && !$this->_hasOptionValue('0')) {
+                return true;
+            }
         }
 
         return parent::isEmpty($data);
+    }
+
+/**
+ * Whether one of the options has the given value.
+ *
+ * @param string $value Value
+ * @return bool True when an option has it
+ */
+    protected function _hasOptionValue(string $value): bool {
+        foreach ($this->options()->get() as $option) {
+            if ((string)$option->value() === $value) {
+                return true;
+            }
+        }
+
+        return false;
     }
 
 /**

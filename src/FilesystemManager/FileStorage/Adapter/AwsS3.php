@@ -108,7 +108,8 @@ class AwsS3 extends Adapter {
             'ResponseContentDisposition' => $this->_getContentDisposition($key, $options),
         ]);
 
-        $request = $s3Client->createPresignedRequest($command, $options['expires']);
+        // Without an expiry the SDK signs a negative X-Amz-Expires, which S3/R2 refuse (400).
+        $request = $s3Client->createPresignedRequest($command, $options['expires'] ?: (parent::config('expires') ?: '+15 minutes'));
         // Get the actual presigned-url
         $objectUrl = (string)$request->getUri();
         if ($options['host']) {
