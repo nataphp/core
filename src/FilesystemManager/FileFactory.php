@@ -97,10 +97,25 @@ class FileFactory {
             [$type] = explode(';', $path);
         } elseif ($options['mime'] || $options['mimeFallback']) {
             $type = $options['mime'] ?? $options['mimeFallback'];
-        } elseif ($extension = pathinfo($path, PATHINFO_EXTENSION)) {
+        } elseif ($extension = pathinfo(static::_stripUrlQuery($path), PATHINFO_EXTENSION)) {
             [$type] = Mimetype::get($extension);
         }
         return $type;
+    }
+
+/**
+ * Remove the query string and fragment from a URL, so that the extension of a
+ * presigned URL (`file.png?X-Amz-...`) is detected.
+ *
+ * @param string $path File URL or absolute path
+ * @return string Path without query string and fragment
+ */
+    protected static function _stripUrlQuery(string $path): string {
+        if (!preg_match('#^[a-z][a-z0-9+.-]*://#i', $path)) {
+            return $path;
+        }
+        $urlPath = parse_url($path, PHP_URL_PATH);
+        return is_string($urlPath) ? $urlPath : $path;
     }
 
 /**

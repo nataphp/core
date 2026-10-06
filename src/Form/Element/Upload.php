@@ -1285,7 +1285,7 @@ class Upload extends Element {
             $merged['path'] = $path;
             $merged['store'] = $postedStore;
             $merged['mime'] = $file->mime();
-            if ($file->is('image') && $file->isRaster()) {
+            if ($file instanceof Image && $file->isRaster()) {
                 $merged['width'] = $file->width();
                 $merged['height'] = $file->height();
             } elseif ($file->is('video') && $file->width() > 0) {
@@ -1400,7 +1400,7 @@ class Upload extends Element {
             $merged['store'] = $postedStore;
             $merged['mime'] = $newFile->mime();
             $merged['size'] = $newFile->size();
-            if ($newFile->is('image') && $newFile->isRaster()) {
+            if ($newFile instanceof Image && $newFile->isRaster()) {
                 $merged['width'] = $newFile->width();
                 $merged['height'] = $newFile->height();
             } elseif ($newFile->is('video') && $newFile->width() > 0) {
