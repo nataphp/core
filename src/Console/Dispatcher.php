@@ -79,14 +79,16 @@ class Dispatcher {
     }
 
 /**
- * Run the dispatcher.
+ * Run the dispatcher and exit with the command's exit code (0 on success),
+ * so cron and deploy scripts see a failing or unknown command.
  *
  * @param array $argv The argv from PHP
+ * @param \Nata\Http\BaseApplication|null $application The application
  * @return void
  */
     public static function run($argv, BaseApplication $application = null) {
         $dispatcher = new Dispatcher($argv, $application);
-        $dispatcher->_stop($dispatcher->dispatch() === false ? 1 : 0);
+        $dispatcher->_stop($dispatcher->dispatch());
     }
 
 /**
