@@ -284,7 +284,8 @@ class AwsS3 extends Adapter {
     }
 
 /**
- * Get file public URL.
+ * Get file URL. In a private store (acl "private") the object URL would be
+ * refused, so a presigned URL is returned instead (see get()).
  *
  * @param string $key File path/key
  * @param array $options Options
@@ -293,6 +294,9 @@ class AwsS3 extends Adapter {
     public function url(string $key, array $options = []): string {
         if (str_contains($key, 'http')) {
             return $key;
+        }
+        if (str_contains((string)parent::config('acl'), 'private')) {
+            return (string)$this->get($key, $options);
         }
         return $this->_getObjectUrl(parent::config('bucket'), $this->_normalizeKey($key), $options);
     }
