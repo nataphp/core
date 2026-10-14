@@ -21,6 +21,8 @@ use Nata\Core\Configure;
 use Nata\Utility\Hash;
 use Nata\Http\Session;
 use ArrayAccess;
+use BadMethodCallException;
+use MethodNotAllowedException;
 use Nata\Routing\Router;
 
 /**
@@ -124,6 +126,7 @@ class Request implements ArrayAccess {
         'get' => ['env' => 'REQUEST_METHOD', 'value' => 'GET'],
         'post' => ['env' => 'REQUEST_METHOD', 'value' => 'POST'],
         'put' => ['env' => 'REQUEST_METHOD', 'value' => 'PUT'],
+        'patch' => ['env' => 'REQUEST_METHOD', 'value' => 'PATCH'],
         'delete' => ['env' => 'REQUEST_METHOD', 'value' => 'DELETE'],
         'head' => ['env' => 'REQUEST_METHOD', 'value' => 'HEAD'],
         'options' => ['env' => 'REQUEST_METHOD', 'value' => 'OPTIONS'],
@@ -177,7 +180,6 @@ class Request implements ArrayAccess {
 
         if ($parseEnvironment) {
             $this->_processPost();
-            $this->_processPatch();
             $this->_processGet();
             $this->_processCookies();
             $this->_processFiles();
@@ -580,18 +582,24 @@ class Request implements ArrayAccess {
     }
 
 /**
- * Magic call method allows dynamicall
- * on routing parameters.
+ * Magic call method: `is$Type()` is the same as `is($type)` (e.g. `isPost()`).
+ *
+ * Any other unknown method throws: returning null silently hid typos and
+ * missing methods (allowMethod() was called for years before it existed, and
+ * guarded nothing).
  *
  * @param string $name The pseudo-method being called.
  * @param array $arguments The arguments passed to pseudo-method.
- * @return mixed The called method return
+ * @return bool Whether the request is of that type.
+ * @throws \BadMethodCallException When the method does not exist.
  */
     public function __call($name, array $arguments) {
-        if (substr($name, 0, 2) === 'is') {
+        if (substr($name, 0, 2) === 'is' && strlen($name) > 2) {
             $type = strtolower(substr($name, 2));
             return $this->is($type);
         }
+
+        throw new BadMethodCallException(sprintf('Method %s::%s() does not exist.', static::class, $name));
     }
 
 /**
@@ -604,9 +612,41 @@ class Request implements ArrayAccess {
     }
 
 /**
+ * Refuse the request unless its HTTP method is one of the allowed ones.
+ *
+ * Call it at the top of actions that change data, so a GET (which skips
+ * the CSRF check) cannot run them:
+ *
+ * ```
+ * $this->request->allowMethod(['post', 'delete']);
+ * ```
+ *
+ * @param string|string[] $methods Allowed methods (any case), e.g. 'post' or ['post', 'delete'].
+ * @return bool True when the method is allowed.
+ * @throws \MethodNotAllowedException When it is not (HTTP 405).
+ */
+    public function allowMethod($methods) {
+        $methods = array_map('strtolower', (array)$methods);
+        foreach ($methods as $method) {
+            if ($this->is($method)) {
+                return true;
+            }
+        }
+
+        throw new MethodNotAllowedException(sprintf(
+            'Method %s is not allowed here (allowed: %s).',
+            strtoupper((string)env('REQUEST_METHOD')),
+            strtoupper(implode(', ', $methods))
+        ));
+    }
+
+/**
  * Check whether or not a Request is a certain type.
  * Uses the built in detection rules as well as additional rules
  * defined with Nata\Http\Request::addDetector(). Any detector can be called as `is($type)` or `is$Type()`.
+ *
+ * With several types, true when the request is any of them (unknown types
+ * count as false and do not stop the check).
  *
  * @param string|array $types The type of request you want to check.
  * @return boolean Whether or not the request is the type you are checking.
@@ -615,7 +655,7 @@ class Request implements ArrayAccess {
         foreach ((array)$types as $type) {
             $type = strtolower($type);
             if (!isset($this->_detectors[$type])) {
-                return false;
+                continue;
             }
 
             if ('htmx' === $type) {
