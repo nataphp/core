@@ -25,3 +25,6 @@ node_modules/
 # Optional: uncomment if compile/cache dirs exist at project root
 # /tmp/
 # /cache/
+
+# Library: the lock belongs to the consuming apps
+/composer.lock

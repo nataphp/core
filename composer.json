@@ -22,6 +22,9 @@
         "phpmailer/phpmailer": "^7.0.2",
         "smarty/smarty": "^5.8.0"
     },
+    "require-dev": {
+        "phpunit/phpunit": "^10.5"
+    },
     "autoload": {
         "psr-4": {
             "Nata\\": "src/"
@@ -31,13 +34,19 @@
             "src/basics.inc.php"
         ]
     },
+    "autoload-dev": {
+        "psr-4": {
+            "Nata\\Test\\": "tests/"
+        }
+    },
     "scripts": {
         "post-install-cmd": [
             "@php vendor/nataphp/core/scripts/sync-nata-assets.php"
         ],
         "post-update-cmd": [
             "@php vendor/nataphp/core/scripts/sync-nata-assets.php"
-        ]
+        ],
+        "test": "phpunit"
     },
     "config": {
         "sort-packages": true

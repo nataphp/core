@@ -474,7 +474,7 @@ class Query extends DatabaseQuery implements JsonSerializable, IteratorAggregate
  */
     public function andHaving($conditions) {
         $this->_count = null;
-        return parent::orHaving($conditions);
+        return parent::andHaving($conditions);
     }
 
 /**
