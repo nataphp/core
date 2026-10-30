@@ -18,6 +18,7 @@
 namespace Nata\Console;
 
 use Nata\Cache\Cache;
+use Nata\Command\Help;
 use Nata\Core\App;
 use Nata\Core\ComposerPlugins;
 use Nata\Core\Configure;
@@ -263,6 +264,10 @@ class Dispatcher {
             ));
             $io->info("Run 'bin/nata help' for a list of available commands.");
             return Command::CODE_ERROR;
+        }
+
+        if ($command instanceof Help) {
+            $command->setCommands($commands);
         }
 
         $optionParser = $command->getOptionParser();

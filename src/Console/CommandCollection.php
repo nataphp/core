@@ -169,7 +169,7 @@ class CommandCollection {
             }
 
             $className = $this->_extractClassName($file);
-            if (!$this->_isCommandClass($className)) {
+            if (!$this->_isCommandClass($className) || $this->_hasCommandClass($className)) {
                 continue;
             }
 
@@ -200,6 +200,22 @@ class CommandCollection {
         $reflection = new ReflectionClass($className);
 
         return $reflection->isInstantiable() && $reflection->isSubclassOf(Command::class);
+    }
+
+/**
+ * Whether a command of this class is already registered (e.g. by the
+ * application under an alias such as "calendar:generate").
+ *
+ * @param string $className Fully qualified class name
+ * @return bool
+ */
+    protected function _hasCommandClass(string $className): bool {
+        foreach ($this->_commands as $command) {
+            if (get_class($command) === $className) {
+                return true;
+            }
+        }
+        return false;
     }
 
 /**

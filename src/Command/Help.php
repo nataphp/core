@@ -31,6 +31,38 @@ use Nata\Utility\Text;
 class Help extends Command {
 
 /**
+ * Default terminal width, when it cannot be detected.
+ *
+ * @var int
+ */
+    public const DEFAULT_WIDTH = 120;
+
+/**
+ * Narrowest width used to wrap descriptions.
+ *
+ * @var int
+ */
+    public const MIN_WIDTH = 60;
+
+/**
+ * Commands registered by the application (with their aliases).
+ *
+ * @var CommandCollection|null
+ */
+    protected $_commands;
+
+/**
+ * Set the commands registered by the application, so the help lists them
+ * under their registered names (e.g. "calendar:generate").
+ *
+ * @param CommandCollection $commands Commands
+ * @return void
+ */
+    public function setCommands(CommandCollection $commands): void {
+        $this->_commands = $commands;
+    }
+
+/**
  * Build option parser.
  *
  * @param OptionParser $optionParser Option parser
@@ -51,29 +83,35 @@ class Help extends Command {
     public function execute(Arguments $args, Io $io): ?int {
         $out = [];
         $out[] = '';
-        $out[] = '<info>Usage:</info>';
-        $out[] = sprintf('%s [options] command [args...]', 'nata');
+        $out[] = '<warning>Usage:</warning>';
+        $out[] = '  nata <success>command</success> [options] [args...]';
         $out[] = '';
 
-        $commands = (new CommandCollection())->autoDiscover()->get();
+        $collection = $this->_commands ?? new CommandCollection();
+        $commands = $collection->autoDiscover()->get();
+        ksort($commands);
+
         if (!empty($commands)) {
-            $out[] = '<info>Available commands:</info>';
-            $out[] = '';
-            $max = $this->_getMaxLength($commands) + 2;
+            $out[] = '<warning>Available commands:</warning>';
+            $nameWidth = $this->_getMaxLength(array_keys($commands)) + 4;
+            $descriptionWidth = max($this->_terminalWidth() - $nameWidth - 1, self::MIN_WIDTH);
+            $indent = str_repeat(' ', $nameWidth);
+
             foreach ($commands as $name => $command) {
-                $cmdline = Text::wrapBlock($name, [
-                    'width' => 72,
-                    'indent' => str_repeat(' ', $max),
-                    'indentAt' => 1,
-                ]);
-
-                if ($desc = $command->getDescription()) {
-                    $cmdline .= str_pad('', strlen($name), ' ');
-                    $cmdline .= $desc;
+                $line = '  <success>' . $name . '</success>';
+                $description = trim($command->getDescription());
+                if ($description !== '') {
+                    $line .= str_repeat(' ', $nameWidth - strlen($name) - 2);
+                    $line .= Text::wrap($description, [
+                        'width' => $descriptionWidth,
+                        'indent' => $indent,
+                        'indentAt' => 1,
+                    ]);
                 }
-
-                $out[] = $cmdline;
+                $out[] = $line;
             }
+            $out[] = '';
+            $out[] = 'Run <info>nata command --help</info> for the options of a command.';
             $out[] = '';
         }
 
@@ -83,17 +121,44 @@ class Help extends Command {
     }
 
 /**
- * Iterate over a collection and find the longest named thing.
+ * Find the longest name.
  *
- * @param array<Command> $collection Collection
+ * @param array<string> $names Names
  * @return int Max length
  */
-    protected function _getMaxLength(array $collection): int {
+    protected function _getMaxLength(array $names): int {
         $max = 0;
-        foreach ($collection as $item) {
-            $max = strlen($item->getName()) > $max ? strlen($item->getName()) : $max;
+        foreach ($names as $name) {
+            $max = max($max, strlen($name));
         }
         return $max;
+    }
+
+/**
+ * Detect the terminal width (COLUMNS, "mode con" on Windows, "stty size"
+ * elsewhere), falling back to DEFAULT_WIDTH.
+ *
+ * @return int Width in columns
+ */
+    protected function _terminalWidth(): int {
+        $columns = (int)getenv('COLUMNS');
+        if ($columns > 0) {
+            return $columns;
+        }
+
+        $output = [];
+        if (DIRECTORY_SEPARATOR === '\\') {
+            // The second value of "mode con" is the number of columns (labels are localized).
+            @exec('mode con', $output);
+            preg_match_all('/:\s*(\d+)/', implode("\n", $output), $matches);
+            $columns = (int)($matches[1][1] ?? 0);
+        } else {
+            @exec('stty size 2>/dev/null', $output);
+            $parts = explode(' ', trim($output[0] ?? ''));
+            $columns = (int)($parts[1] ?? 0);
+        }
+
+        return $columns > 0 ? $columns : self::DEFAULT_WIDTH;
     }
 
 }
