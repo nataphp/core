@@ -20,6 +20,7 @@ namespace Nata\Console;
 
 use Nata\Core\App;
 use Nata\Utility\Inflector;
+use ReflectionClass;
 use RecursiveDirectoryIterator;
 use RegexIterator;
 
@@ -168,6 +169,9 @@ class CommandCollection {
             }
 
             $className = $this->_extractClassName($file);
+            if (!$this->_isCommandClass($className)) {
+                continue;
+            }
 
             $command = new $className;
             [$root, $name] = explode(' ', $command->getName(), 2);
@@ -177,6 +181,25 @@ class CommandCollection {
 
             $this->_commands[$name] = $command;
         }
+    }
+
+/**
+ * Whether the class is a concrete command that can be instantiated.
+ *
+ * Skips abstract base classes, interfaces, traits and helpers that live in
+ * the Command folder but are not commands.
+ *
+ * @param string $className Fully qualified class name
+ * @return bool
+ */
+    protected function _isCommandClass(string $className): bool {
+        if ($className === '' || !class_exists($className)) {
+            return false;
+        }
+
+        $reflection = new ReflectionClass($className);
+
+        return $reflection->isInstantiable() && $reflection->isSubclassOf(Command::class);
     }
 
 /**
