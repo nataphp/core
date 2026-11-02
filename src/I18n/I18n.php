@@ -253,7 +253,11 @@ class I18n {
         $_this = static::getInstance();
         if (func_num_args() === 0) {
             if ($_this->_available === null) {
-                $current = static::locale();
+                // Not static::locale(): with no locale set yet, locale() negotiates
+                // Accept-Language through this method (infinite recursion). The
+                // default locale is enough: the negotiation only returns a locale
+                // from this list or the default one.
+                $current = $_this->_locale ?? $_this->_defaultLocale;
                 $_this->_available = [(string)$current => new L10n($current)];
 
                 $baseLocale = $_this->_sourceLocale;
