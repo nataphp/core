@@ -179,7 +179,7 @@ class Output {
             ) ||
             (
                 function_exists('posix_isatty') &&
-                !posix_isatty($this->_output)
+                !stream_isatty($this->_output)
             ) ||
             (
                 env('NO_COLOR') !== null
