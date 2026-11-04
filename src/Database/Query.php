@@ -636,7 +636,7 @@ class Query {
 /**
  * Set/Get FROM parameter for Query Builder.
  *
- * @param string $table Table name
+ * @param string|\Nata\Database\Query $table Table name, or a query to use as a derived table
  * @param string $alias Table alias
  * @return $this|array
  */
@@ -645,16 +645,21 @@ class Query {
             return $this->_dbalMapFromParts($this->_dbalGetPrivate($this->_loadBuilder(), 'from'));
         }
 
+        // Clear before adding, so a derived table's parameters are kept
+        $this->_clearClause('from');
+
         if (is_string($table)) {
             $table = $this->_escapeReservedKeyword($table);
             $alias = $this->_escapeReservedKeyword($alias);
             $this->_aliases[$table] = $alias;
         } elseif ($table instanceof Query) {
-            $this->getParameterManager()->add($table->params(), 'from');
-            $table = '(' . $table->sql() . ')';
+            // SQL first: an ORM query only adds some parameters (e.g. matching)
+            // when it builds its SQL
+            $sql = '(' . $table->sql() . ')';
+            $this->getParameterManager()->add($table->getParameterManager()->getPrepared(true), 'from');
+            $table = $sql;
         }
 
-        $this->_clearClause('from');
         $this->_loadBuilder()->from($table, $alias);
 
         return $this;
