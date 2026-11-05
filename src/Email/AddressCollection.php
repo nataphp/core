@@ -259,6 +259,17 @@ class AddressCollection extends ArrayIterator implements JsonSerializable {
     }
 
 /**
+ * Addresses as an email header value (From, To, Cc, Reply-To), see Address::getMimeHeader().
+ *
+ * @return string Header-safe, comma separated addresses
+ */
+    public function getMimeHeader(): string {
+        return implode(', ', array_filter(array_map(function ($address) {
+            return $address->getMimeHeader();
+        }, $this->toArray())));
+    }
+
+/**
  * __toString.
  *
  * @return string RFC 822 addresses ()

@@ -347,14 +347,46 @@ class Address implements JsonSerializable {
         }
 
         if (!empty($this->_personal)) {
-            $address .= preg_match("/[\'^£$%&*()}{@#~?><>,\/|=_+¬-]/ui", $this->_personal) === 0
-                 ? $this->_personal : '"' . $this->_personal . '"';
-            $address .= ' <' . $this->email() . '>';
+            $address .= $this->_quotedPersonal() . ' <' . $this->email() . '>';
         } else {
             $address .= $this->email();
         }
 
         return $htmlEncoded ? htmlspecialchars($address) : $address;
+    }
+
+/**
+ * Get as an email header value (From, To, Cc, Reply-To).
+ *
+ * Like getRfc822(), but a name with non-ASCII characters is MIME encoded
+ * (RFC 2047), as headers must be plain ASCII.
+ *
+ * @return string Header-safe address
+ */
+    public function getMimeHeader(): string {
+        if (!$this->email()) {
+            return '';
+        }
+
+        if (empty($this->_personal) || preg_match('/[^\x20-\x7e]/', $this->_personal) !== 1) {
+            return $this->getRfc822();
+        }
+
+        return mb_encode_mimeheader($this->_personal, 'UTF-8', 'B', "\r\n") . ' <' . $this->email() . '>';
+    }
+
+/**
+ * Personal part, quoted when it has characters that would break the address
+ * (RFC 5322 specials such as the comma in "Company, Lda"), with quotes and
+ * backslashes escaped inside the quoted string.
+ *
+ * @return string Personal part ready to precede "<email>"
+ */
+    protected function _quotedPersonal(): string {
+        if (preg_match("/[()<>\[\]:;@\\\\,.\"\'^£$%&*}{#~?\/|=_+¬-]/u", $this->_personal) === 0) {
+            return $this->_personal;
+        }
+        return '"' . addcslashes($this->_personal, '"\\') . '"';
     }
 
 /**

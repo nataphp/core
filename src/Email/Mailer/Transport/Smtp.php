@@ -611,18 +611,18 @@ class Smtp extends Transport {
 
         $headers = [];
         $headers['Date'] = (new Time('now', 'Europe/Lisbon'))->format('r');
-        $headers['From'] = $this->_formatAddress($message->from());
+        $headers['From'] = $message->from()->getMimeHeader();
 
         if ($message->to() && !$message->to()->isEmpty()) {
-            $headers['To'] = $this->_formatAddressList($message->to());
+            $headers['To'] = $message->to()->getMimeHeader();
         }
 
         if ($message->cc() && !$message->cc()->isEmpty()) {
-            $headers['Cc'] = $this->_formatAddressList($message->cc());
+            $headers['Cc'] = $message->cc()->getMimeHeader();
         }
 
         if ($message->replyTo() && !$message->replyTo()->isEmpty()) {
-            $headers['Reply-To'] = $this->_formatAddressList($message->replyTo());
+            $headers['Reply-To'] = $message->replyTo()->getMimeHeader();
         }
 
         if ($message->readReceipt() && !$message->readReceipt()->isEmpty()) {
@@ -803,37 +803,6 @@ class Smtp extends Transport {
             $lines[] = $name . ': ' . $value;
         }
         return implode(self::CRLF, $lines) . self::CRLF . self::CRLF . $part['body'];
-    }
-
-/**
- * Format a single address as an RFC 5322 header value with an encoded name.
- *
- * @param \Nata\Email\Address $address Address to format.
- * @return string Formatted address (e.g. '=?UTF-8?B?...?= <a@b.com>').
- */
-    protected function _formatAddress($address): string {
-        $email = $address->email();
-        $personal = (string)$address->personal();
-
-        if ($personal === '') {
-            return $email;
-        }
-
-        return $this->_encodeHeader($personal) . ' <' . $email . '>';
-    }
-
-/**
- * Format an address collection as a comma-separated header value.
- *
- * @param \Nata\Email\AddressCollection $collection Addresses to format.
- * @return string Comma-separated list of formatted addresses.
- */
-    protected function _formatAddressList($collection): string {
-        $formatted = [];
-        foreach ($collection as $address) {
-            $formatted[] = $this->_formatAddress($address);
-        }
-        return implode(', ', $formatted);
     }
 
 /**
