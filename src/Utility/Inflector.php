@@ -732,14 +732,30 @@ class Inflector {
  * Returns a string with all spaces converted to underscores (by default), accented
  * characters converted to non-accented characters, and non word characters removed.
  *
+ * By default letters outside the transliteration table (Cyrillic, Greek, CJK, ...)
+ * are kept as they are ("Москва" stays "москва"). With $ascii the result holds only
+ * ASCII letters, digits and the replacement: the text goes through transliterate()
+ * first and whatever is left outside ASCII is dropped. Use it for slugs that end
+ * up in URLs.
+ *
  * @param string $string the string you want to slug
  * @param string $replacement will replace keys in map
  * @param bool $lowercase SLug in lower case (defaults to true)
+ * @param bool $ascii Transliterate to plain ASCII (defaults to false)
  * @return string
  * @link http://book.cakephp.org/2.0/en/core-utility-libraries/inflector.html#Inflector::slug
  */
-    public static function slug($string, $replacement = '_', $lowercase = true) {
+    public static function slug($string, $replacement = '_', $lowercase = true, bool $ascii = false) {
         $quotedReplacement = preg_quote($replacement, '/');
+
+        if ($ascii) {
+            $map = array(
+                '/[^A-Za-z0-9]+/' => $replacement,
+                sprintf('/^(?:%s)+|(?:%s)+$/', $quotedReplacement, $quotedReplacement) => '',
+            );
+            $string = preg_replace(array_keys($map), array_values($map), static::transliterate((string)$string));
+            return ($lowercase ? strtolower($string) : $string);
+        }
 
         $map = array(
             '/[^\s\p{Zs}\p{Ll}\p{Lm}\p{Lo}\p{Lt}\p{Lu}\p{Nd}]/mu' => ' ',
@@ -750,6 +766,29 @@ class Inflector {
         $string = str_replace(array_keys(static::$_transliteration), array_values(static::$_transliteration), $string);
         $string = preg_replace(array_keys($map), array_values($map), $string);
         return ($lowercase ? strtolower($string) : $string);
+    }
+
+/**
+ * Transliterate a string to ASCII: any script to Latin, then Latin to ASCII
+ * ("yeИdry" -> "yeIdry", "Москва" -> "Moskva", "Ærø" -> "AEro"). Case is kept.
+ *
+ * Uses ICU (the intl extension) when present. Without it, only the characters in
+ * the transliteration table are converted and any other non-ASCII character is
+ * dropped, so the result is always ASCII.
+ *
+ * @param string $string Text to transliterate
+ * @return string ASCII text
+ */
+    public static function transliterate(string $string): string {
+        if (function_exists('transliterator_transliterate')) {
+            $result = transliterator_transliterate('Any-Latin; Latin-ASCII', $string);
+            if (is_string($result)) {
+                return $result;
+            }
+        }
+
+        $string = str_replace(array_keys(static::$_transliteration), array_values(static::$_transliteration), $string);
+        return (string)preg_replace('/[^\x00-\x7F]+/', '', $string);
     }
 
 }
