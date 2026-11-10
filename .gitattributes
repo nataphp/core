@@ -1,0 +1,6 @@
+# The bundles embed the sources (sourcesContent in the .map files) and the build
+# copies CSS from src to dist, so the line endings of the working tree end up in
+# the built files. Keep them LF on every machine, whatever core.autocrlf says,
+# so that a build without code changes produces byte-identical files.
+frontend/src/** text=auto eol=lf
+frontend/dist/** text=auto eol=lf
