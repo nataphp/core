@@ -5,7 +5,7 @@
   "type": "module",
   "main": "index.js",
   "scripts": {
-    "test": "echo \"Error: no test specified\" && exit 1",
+    "test": "node --test \"tests/js/*.test.mjs\"",
     "build:nata:js": "rollup -c rollup.nata.config.js",
     "build:nata:js:watch": "rollup -c rollup.nata.config.js --watch",
     "build:nata:css": "cleancss -o frontend/dist/nata.notifier.min.css frontend/src/css/form/nata.notifier.css && cleancss -o frontend/dist/nata.form.min.css frontend/src/css/form/nata.form.css && cleancss -o frontend/dist/nata.upload.min.css frontend/src/css/form/nata.upload.css && cleancss -o frontend/dist/nata.wizard.min.css frontend/src/css/form/nata.wizard.css && cleancss -o frontend/dist/nata.groups.min.css frontend/src/css/form/nata.groups.css && cpy \"frontend/src/css/form/*.css\" frontend/dist/",

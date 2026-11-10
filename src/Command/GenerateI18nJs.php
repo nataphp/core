@@ -24,7 +24,10 @@ use Nata\Core\App;
 use Nata\I18n\I18n;
 
 /**
- * Command to generate JavaScript dictionary files for all available locales.
+ * Command to generate JavaScript dictionary files for all available locales,
+ * and the list of them (public/i18n/languages.json) that i18n.js reads to
+ * request only a dictionary that exists (a page in "pt-PT" gets "pt.js"
+ * without a 404 for "pt-PT.js").
  */
 class GenerateI18nJs extends Command {
 
@@ -101,6 +104,14 @@ class GenerateI18nJs extends Command {
             } else {
                 $errors++;
             }
+        }
+
+        $languages = static::writeLanguageList(App::path('public/i18n/'));
+        if ($languages === null) {
+            $io->error('  Could not write public/i18n/languages.json');
+            $errors++;
+        } else {
+            $io->out(sprintf('  languages.json: %s', $languages === [] ? '(none)' : implode(', ', $languages)));
         }
 
         $io->out('');
@@ -205,6 +216,35 @@ class GenerateI18nJs extends Command {
 
         I18n::locale($originalLocale);
         return true;
+    }
+
+/**
+ * Write the list of the dictionaries in a folder (languages.json): every
+ * {code}.js there, also those not generated in this run. i18n.js reads it to
+ * request only a dictionary that exists, the language of the page or its base
+ * language.
+ *
+ * @param string $directory Folder of the dictionaries (public/i18n/)
+ * @return array|null Codes written (sorted), or null when the folder is missing or not writable
+ */
+    public static function writeLanguageList(string $directory): ?array {
+        $directory = rtrim($directory, '/\\');
+        if ($directory === '' || !is_dir($directory)) {
+            return null;
+        }
+        $codes = [];
+        foreach (glob($directory . DIRECTORY_SEPARATOR . '*.js') ?: [] as $file) {
+            $code = basename($file, '.js');
+            if (preg_match('/^[A-Za-z]{2,3}([_-][A-Za-z0-9]{2,8})*$/', $code) === 1) {
+                $codes[] = $code;
+            }
+        }
+        sort($codes);
+        if (file_put_contents($directory . DIRECTORY_SEPARATOR . 'languages.json', json_encode($codes)) === false) {
+            return null;
+        }
+
+        return $codes;
     }
 
 /**
