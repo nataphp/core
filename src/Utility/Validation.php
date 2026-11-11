@@ -22,9 +22,7 @@ use Exception;
 use InvalidArgumentException;
 use Nata\Core\App;
 use Nata\Filesystem\File;
-use Nata\Http\Client;
 use Nata\I18n\Time\LocalizedDateParser;
-use SoapClient;
 
 /**
  * Offers different validation methods.
@@ -620,37 +618,6 @@ class Validation {
             $regex = '/^(?!\x{00a2})\p{Sc}?' . $money . '$/u';
         }
         return static::_check($check, $regex);
-    }
-
-/**
- * @TODO
- * Checks if VAT number is valid.
- *
- * @param string $check Value to check
- * @param string $symbolPosition Where symbol is located (left/right)
- * @return boolean Success
- */
-    public static function vatNumber($check, $country = 'PT') {
-        if (!static::numeric($check)) {
-            return false;
-        }
-
-        $response = Client::get([
-            'url' => 'http://www.nif.pt/',
-            'data' => [
-                'json' => 1,
-                'q' => $check,
-                'key' => 'ba4d4b3977de57d41234afbdd5d00225'
-            ]
-        ])->send();
-
-        print_a($response);die;
-
-        $client = new SoapClient("http://ec.europa.eu/taxation_customs/vies/checkVatService.wsdl", array('trace' => true) );
-
-        print_a($client->checkVat(array('countryCode' => $country, 'vatNumber' => $check)));
-        die;
-
     }
 
 /**
