@@ -1022,7 +1022,11 @@ class Router {
 
         // Reject path traversal attempts (e.g. ..\..\..\var\log or ..%2f..%2fetc)
         if (static::_isPathTraversal($url)) {
-            Cache::write($cacheKey, $out, $cacheConfig);
+            // Without a routing cache there is no key: write only with one
+            // (a traversal URL was a TypeError, so a 500, not a 404).
+            if ($cacheConfig) {
+                Cache::write($cacheKey, $out, $cacheConfig);
+            }
             return $out;
         }
 
