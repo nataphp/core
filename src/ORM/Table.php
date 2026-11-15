@@ -1425,8 +1425,9 @@ class Table extends NataObject implements Listener {
                 $propertyValue = trim($propertyValue);
             }
 
-            // Check if is date/time field
-            if (stripos($typeName, 'date') !== false || $typeName === 'time' || $typeName === 'year') {
+            // Check if is date/time field (an immutable type by its mutable name)
+            $mutableTypeName = $type->lookupName(Schema::mutableType($type));
+            if (stripos($mutableTypeName, 'date') !== false || $mutableTypeName === 'time' || $mutableTypeName === 'year') {
                 $propertyValue = $this->_formatDatabaseDateTime($type, $propertyValue, $databasePlatform);
             } else {
                 $propertyValue = $type->convertToDatabaseValue($propertyValue, $databasePlatform);
@@ -1483,7 +1484,8 @@ class Table extends NataObject implements Listener {
         // Database timezone
         $value->timezone('UTC');
 
-        $string = $type->convertToDatabaseValue($value, $databasePlatform);
+        // Time is a mutable DateTime: an immutable type (set with columnType()) writes it as its mutable type
+        $string = Schema::mutableType($type)->convertToDatabaseValue($value, $databasePlatform);
 
         // Revert to original timezone
         $value->timezone($timezone);
@@ -1924,7 +1926,7 @@ class Table extends NataObject implements Listener {
             foreach ($columns as $columnName) {
                 $column = $schema->column($columnName);
                 $type = $column->getType();
-                $typeName = $type->lookupName($type);
+                $typeName = $type->lookupName(Schema::mutableType($type));
 
                 $value = $entity->get($columnName);
                 if (empty($value)) {

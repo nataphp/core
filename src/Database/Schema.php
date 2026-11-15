@@ -20,12 +20,29 @@ namespace Nata\Database;
 use Doctrine\DBAL\Schema\Column;
 use Doctrine\DBAL\Schema\Index;
 use Doctrine\DBAL\Types\Type;
+use Doctrine\DBAL\Types\Types;
 use Nata\Database\Exception\SchemaException;
 
 /**
  * Table schema.
  */
 class Schema {
+
+/**
+ * Immutable date and time types, with the mutable type the ORM uses instead.
+ *
+ * DBAL 4.6 introspects the MySQL/MariaDB DATE, DATETIME, TIMESTAMP, TIME and YEAR
+ * columns as immutable types, while the ORM writes Nata\I18n\Time, a mutable
+ * DateTime: an introspected column keeps the mutable type, as before 4.6.
+ *
+ * @var array<string, string>
+ */
+    const MUTABLE_TYPES = [
+        Types::DATE_IMMUTABLE => Types::DATE_MUTABLE,
+        Types::DATETIME_IMMUTABLE => Types::DATETIME_MUTABLE,
+        Types::DATETIMETZ_IMMUTABLE => Types::DATETIMETZ_MUTABLE,
+        Types::TIME_IMMUTABLE => Types::TIME_MUTABLE
+    ];
 
 /**
  * Connection.
@@ -339,7 +356,8 @@ class Schema {
                     }
                     $column->setType($columnTypes[$columnName]);
                 } else {
-                    $columnTypes[$columnName] = $column->getType();
+                    $columnTypes[$columnName] = static::mutableType($column->getType());
+                    $column->setType($columnTypes[$columnName]);
                 }
 
                 $columns[$columnName] = $column;
@@ -360,6 +378,21 @@ class Schema {
         }
 
         return $columns;
+    }
+
+/**
+ * Mutable equivalent of an immutable date or time type (see MUTABLE_TYPES).
+ *
+ * @param Type $type Column type
+ * @return Type The mutable type, or the type given if it has none
+ */
+    public static function mutableType(Type $type): Type {
+        $name = Type::lookupName($type);
+        if (!isset(static::MUTABLE_TYPES[$name])) {
+            return $type;
+        }
+
+        return Type::getType(static::MUTABLE_TYPES[$name]);
     }
 
 /**
