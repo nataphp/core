@@ -22,6 +22,7 @@ use Nata\FilesystemManager\File\Image;
 use Nata\FilesystemManager\FileFactory;
 use Nata\FilesystemManager\FileStorage;
 use Nata\FilesystemManager\Mimetype;
+use Nata\Log\Log;
 use InvalidArgumentException;
 use Exception;
 
@@ -129,7 +130,7 @@ class ThumbnailGenerator {
             return $this->_getThumbnailUrl($cacheKey, $options['store']);
 
         } catch (Exception $e) {
-            App::log('Thumbnail generation failed: ' . $e->getMessage(), 'error');
+            Log::write('error', 'Thumbnail generation failed: ' . $e->getMessage());
             return $this->_getFallbackIcon('default', $options);
         }
     }
@@ -316,7 +317,7 @@ class ThumbnailGenerator {
             return $thumbnailFile;
 
         } catch (Exception $e) {
-            App::log('Image thumbnail generation failed: ' . $e->getMessage(), 'error');
+            Log::write('error', 'Image thumbnail generation failed: ' . $e->getMessage());
             return false;
         }
     }
@@ -356,7 +357,7 @@ class ThumbnailGenerator {
             return FileFactory::build($tempPath);
 
         } catch (Exception $e) {
-            App::log('PDF thumbnail generation failed: ' . $e->getMessage(), 'error');
+            Log::write('error', 'PDF thumbnail generation failed: ' . $e->getMessage());
             return false;
         }
     }
@@ -389,14 +390,14 @@ class ThumbnailGenerator {
             exec($command, $output, $returnCode);
 
             if ($returnCode !== 0 || !file_exists($tempPath)) {
-                App::log('FFmpeg thumbnail generation failed: ' . implode("\n", $output), 'error');
+                Log::write('error', 'FFmpeg thumbnail generation failed: ' . implode("\n", $output));
                 return false;
             }
 
             return FileFactory::build($tempPath);
 
         } catch (Exception $e) {
-            App::log('Video thumbnail generation failed: ' . $e->getMessage(), 'error');
+            Log::write('error', 'Video thumbnail generation failed: ' . $e->getMessage());
             return false;
         }
     }
@@ -427,7 +428,13 @@ class ThumbnailGenerator {
  * @return bool True if thumbnail exists
  */
     protected function _thumbnailExists(string $cacheKey, string $store): bool {
-        return FileStorage::exists($cacheKey, $store);
+        // The storage could not be asked: generate it again rather than fail
+        try {
+            return FileStorage::exists($cacheKey, $store);
+        } catch (Exception $e) {
+            Log::write('error', 'Thumbnail check failed: ' . $e->getMessage());
+            return false;
+        }
     }
 
 /**
@@ -463,7 +470,7 @@ class ThumbnailGenerator {
             return $stored;
 
         } catch (Exception $e) {
-            App::log('Thumbnail storage failed: ' . $e->getMessage(), 'error');
+            Log::write('error', 'Thumbnail storage failed: ' . $e->getMessage());
             return false;
         }
     }

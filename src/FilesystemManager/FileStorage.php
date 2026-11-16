@@ -167,7 +167,13 @@ class FileStorage {
  * - `overwrite` (bool): Overwrite file if exists
  * - `allowEmpty` (bool): Allow empty file
  * - `accept` (string): Accepted file mimetype
- * - `visibility` (string): File visibility
+ * - `visibility` (string): "public" or "private"; without it (and without
+ *   `acl`), the ACL of the store
+ * - `acl` (string): ACL (object storage adapters), before `visibility`
+ * - `metadata` (array): Metadata kept with the file (object storage: scalar
+ *   values only)
+ * - `checksum` (bool): Object storage adapters send the SHA-256 of the
+ *   contents, and the storage refuses the file if it does not match
  * - `asObject` (bool): Return file as File instance
  * - `throwException` (bool): Throw exception on error
  *
@@ -185,7 +191,7 @@ class FileStorage {
             'existingFileStrategy' => 'ignore',
             'allowEmpty' => false,
             'accept' => '*/*',
-            'visibility' => 'public',
+            'visibility' => null,
             'asObject' => true,
             'throwException' => false,
             'metadata' => []
@@ -292,7 +298,7 @@ class FileStorage {
             'name' => null,
             'mimeFallback' => null,
             'accept' => '*/*',
-            'visibility' => 'public',
+            'visibility' => null,
             'deleteSource' => false,
             'asObject' => true,
             'throwException' => false,
@@ -402,6 +408,33 @@ class FileStorage {
     public static function exists(string $path, string $store = null): bool {
         [$path, $store] = static::_extractPathAndStore($path, $store);
         return static::store($store)->exists($path);
+    }
+
+/**
+ * Information about a stored file (Adapter::info()): size, etag, mime,
+ * modified, metadata and checksumSha256.
+ *
+ * @param string $path File identifier
+ * @param string $store Store name
+ * @return array|null Information, or null when the file does not exist
+ * @throws \Nata\FilesystemManager\Exception\FileStorageException When the store cannot be asked or does not support it.
+ */
+    public static function info(string $path, string $store = null): ?array {
+        [$path, $store] = static::_extractPathAndStore($path, $store);
+        return static::store($store)->info($path);
+    }
+
+/**
+ * Contents of a stored file.
+ *
+ * @param string $path File identifier
+ * @param string $store Store name
+ * @return string|null Contents, or null when the file does not exist
+ * @throws \Nata\FilesystemManager\Exception\FileStorageException When the store cannot be asked or does not support it.
+ */
+    public static function read(string $path, string $store = null): ?string {
+        [$path, $store] = static::_extractPathAndStore($path, $store);
+        return static::store($store)->read($path);
     }
 
 /**

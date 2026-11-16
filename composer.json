@@ -23,7 +23,11 @@
         "smarty/smarty": "^5.8.0"
     },
     "require-dev": {
+        "aws/aws-sdk-php": "^3.373",
         "phpunit/phpunit": "^10.5"
+    },
+    "suggest": {
+        "aws/aws-sdk-php": "Required by the object storage adapters (AwsS3, CloudflareR2, Hetzner, DigitalOceanSpaces)"
     },
     "autoload": {
         "psr-4": {

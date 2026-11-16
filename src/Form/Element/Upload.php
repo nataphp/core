@@ -17,11 +17,13 @@ namespace Nata\Form\Element;
 
 use Closure;
 use Nata\Core\Configure;
+use Nata\FilesystemManager\Exception\FileStorageException;
 use Nata\Form\Element;
 use Nata\FilesystemManager\File;
 use Nata\FilesystemManager\File\Image;
 use Nata\Utility\Number as UtilityNumber;
 use Nata\FilesystemManager\FileStorage;
+use Nata\Log\Log;
 use Nata\ORM\Entity;
 
 /**
@@ -1257,7 +1259,14 @@ class Upload extends Element {
                 $this->error(__('Store mismatch for uploaded file.'));
                 return null;
             }
-            if (!FileStorage::exists($path, $postedStore)) {
+            try {
+                $exists = FileStorage::exists($path, $postedStore);
+            } catch (FileStorageException $e) {
+                Log::write('error', 'Upload check failed: ' . $e->getMessage());
+                $this->error(__('The file storage could not be reached. Please try again.'));
+                return null;
+            }
+            if (!$exists) {
                 $this->error(__('Uploaded file is no longer available.'));
                 return null;
             }

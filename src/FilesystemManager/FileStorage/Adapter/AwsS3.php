@@ -23,6 +23,7 @@ use Aws\CommandInterface;
 use Aws\Exception\AwsException;
 use Aws\ResultInterface;
 use Aws\S3\Exception\S3Exception;
+use Nata\FilesystemManager\Exception\FileStorageException;
 use Nata\FilesystemManager\Mimetype;
 use Nata\FilesystemManager\FileStorage\Adapter;
 use Nata\Utility\Text;
@@ -45,7 +46,8 @@ class AwsS3 extends Adapter {
  * - `usePathStyleEndpoint` Use path style endpoint
  * - `publicKey` Public key
  * - `secretKey` Secret key
- * - `acl` ACL
+ * - `acl` ACL of the files put without one
+ * - `handler` HTTP handler of the SDK client (tests: Aws\MockHandler)
  *
  * @var array
  */
@@ -58,7 +60,8 @@ class AwsS3 extends Adapter {
         'usePathStyleEndpoint' => false,
         'publicKey' => null,
         'secretKey' => null,
-        'acl' => 'private'
+        'acl' => 'private',
+        'handler' => null
     ];
 
 /**
@@ -67,6 +70,13 @@ class AwsS3 extends Adapter {
  * @var int
  */
     protected $_concurrencyLimit = 25;
+
+/**
+ * SDK client, created on first use.
+ *
+ * @var \Aws\S3\S3Client|null
+ */
+    protected $_client;
 
 
 /**
@@ -121,6 +131,15 @@ class AwsS3 extends Adapter {
 /**
  * Put file.
  *
+ * ### Options
+ * - `mime` Content type (default: detected)
+ * - `dryRun` Return the URL without storing
+ * - `acl` ACL; without it, `visibility` ("public" or "private"), then the
+ *   `acl` of the store
+ * - `metadata` User metadata; only scalar values are sent (as strings)
+ * - `checksum` Send the SHA-256 of the contents: the storage refuses the
+ *   file if it does not arrive with it
+ *
  * @param string $key Key
  * @param string $contents Contents
  * @param array $options Options
@@ -131,7 +150,11 @@ class AwsS3 extends Adapter {
             'mime' => null,
             'dryRun' => false,
             'host' => null,
-            'acl' => 'public-read',
+            'acl' => null,
+            'visibility' => null,
+            'name' => null,
+            'metadata' => [],
+            'checksum' => false,
             'cdn' => true
         ];
 
@@ -140,19 +163,23 @@ class AwsS3 extends Adapter {
             return $this->_getObjectUrl(parent::config('bucket'), $key, $options);
         }
 
+        $params = [
+            'Bucket' => parent::config('bucket'),
+            'Key' => $key,
+            'ContentType' => $options['mime'] ?? Mimetype::detect($contents),
+            'Body' => $contents,
+            'ACL' => $this->_resolveAcl($options['acl'], $options['visibility']),
+            'Metadata' => $this->_normalizeMetadata([
+                'original-filename' => $options['name'] ?? pathinfo($key, PATHINFO_BASENAME)
+            ] + (array)$options['metadata'])
+        ];
+        if ($options['checksum']) {
+            $params['ChecksumSHA256'] = base64_encode(hash('sha256', $contents, true));
+        }
+
         try {
-            $s3Client = $this->_loadS3Client();
-            $result = $s3Client->putObject([
-                'Bucket' => parent::config('bucket'),
-                'Key' => $key,
-                'ContentType' => $options['mime'] ?? Mimetype::detect($contents),
-                'Body' => $contents,
-                'ACL' => $this->_getNormalizedAcl($options['acl']),
-                'Metadata' => [
-                    'original-filename' => $options['name'] ?? pathinfo($key, PATHINFO_BASENAME)
-                ] + $options['metadata']
-            ]);
-        } catch (S3Exception $e) {
+            $result = $this->_loadS3Client()->putObject($params);
+        } catch (AwsException $e) {
             $this->_setError($e->getMessage());
             return null;
         }
@@ -200,28 +227,30 @@ class AwsS3 extends Adapter {
             ]);
         }
 
-        if ($commands) {
-            // Create a command pool with a concurrency of N
-            $pool = new CommandPool($s3Client, $commands, [
-                'concurrency' => $this->_negotiateOptimalConcurrencyLimit(count($commands)),
-                // Before
-                'before' => function (CommandInterface $command, int $index) use ($handlers, $indexMap) {
-                    $handler = $handlers[$indexMap[$index]];
-                    $this->dispatchEvent('FileRepository.Adapter.beforePut', [$handler]);
-                    $this->dispatchEvent('FileRepository.Adapter.putStatus', [$handler, 'uploading']);
-                },
-                // Success!
-                'fulfilled' => function (ResultInterface $result, int $index) use ($handlers, $indexMap) {
-                    $handler = $handlers[$indexMap[$index]];
-                    $this->dispatchEvent('FileRepository.Adapter.afterPut', [$handler, $result->get('ObjectURL')]);
-                },
-                // Something wrong happened...
-                'rejected' => function (S3Exception $reason, int $index) use ($handlers, $indexMap) {
-                    $handler = $handlers[$indexMap[$index]];
-                    $this->dispatchEvent('FileRepository.Adapter.putError', [$handler, $reason->getMessage()]);
-                },
-            ]);
+        if (!$commands) {
+            return [];
         }
+
+        // Create a command pool with a concurrency of N
+        $pool = new CommandPool($s3Client, $commands, [
+            'concurrency' => $this->_negotiateOptimalConcurrencyLimit(count($commands)),
+            // Before
+            'before' => function (CommandInterface $command, int $index) use ($handlers, $indexMap) {
+                $handler = $handlers[$indexMap[$index]];
+                $this->dispatchEvent('FileRepository.Adapter.beforePut', [$handler]);
+                $this->dispatchEvent('FileRepository.Adapter.putStatus', [$handler, 'uploading']);
+            },
+            // Success!
+            'fulfilled' => function (ResultInterface $result, int $index) use ($handlers, $indexMap) {
+                $handler = $handlers[$indexMap[$index]];
+                $this->dispatchEvent('FileRepository.Adapter.afterPut', [$handler, $result->get('ObjectURL')]);
+            },
+            // Something wrong happened...
+            'rejected' => function (S3Exception $reason, int $index) use ($handlers, $indexMap) {
+                $handler = $handlers[$indexMap[$index]];
+                $this->dispatchEvent('FileRepository.Adapter.putError', [$handler, $reason->getMessage()]);
+            },
+        ]);
 
         // clear some memory?
         $commands = [];
@@ -315,27 +344,79 @@ class AwsS3 extends Adapter {
     }
 
 /**
- * Check if file exists.
+ * Check if file exists. Only a 404 means it does not: any other error
+ * (credentials, network) throws, so it is never taken for a missing file.
  *
  * @param string $key File key/path
  * @return bool
+ * @throws \Nata\FilesystemManager\Exception\FileStorageException When the storage cannot be asked.
  */
     public function exists(string $key): bool {
+        return $this->info($key) !== null;
+    }
+
+/**
+ * Information about a stored file, from one HEAD request.
+ *
+ * - `size` Size in bytes
+ * - `etag` ETag, without quotes (the MD5 of the contents for a single part
+ *   put, in S3 and R2)
+ * - `mime` Content type
+ * - `modified` Last modified (Unix timestamp)
+ * - `metadata` User metadata
+ * - `checksumSha256` SHA-256 of the contents (hex), when it was put with
+ *   `checksum` and the storage returns it
+ *
+ * @param string $key File key/path
+ * @return array|null Information, or null when the file does not exist
+ * @throws \Nata\FilesystemManager\Exception\FileStorageException When the storage cannot be asked.
+ */
+    public function info(string $key): ?array {
         try {
-            $s3Client = $this->_loadS3Client();
-            // Use the HeadObject method to check if the object exists
-            $result = $s3Client->headObject([
+            $result = $this->_loadS3Client()->headObject([
+                'Bucket' => parent::config('bucket'),
+                'Key' => $this->_normalizeKey($key),
+                'ChecksumMode' => 'ENABLED'
+            ]);
+        } catch (AwsException $e) {
+            if ($e->getStatusCode() === 404) {
+                return null;
+            }
+            throw new FileStorageException(sprintf('Unable to read "%s" in store "%s": %s', $key, $this->getStoreName(), $e->getMessage()), 0, $e);
+        }
+
+        $modified = $result->get('LastModified');
+        $checksum = $result->get('ChecksumSHA256');
+        return [
+            'size' => (int)$result->get('ContentLength'),
+            'etag' => $result->get('ETag') === null ? null : trim((string)$result->get('ETag'), '"'),
+            'mime' => $result->get('ContentType'),
+            'modified' => $modified instanceof \DateTimeInterface ? $modified->getTimestamp() : null,
+            'metadata' => (array)$result->get('Metadata'),
+            'checksumSha256' => $checksum ? bin2hex((string)base64_decode((string)$checksum)) : null,
+        ];
+    }
+
+/**
+ * Contents of a stored file.
+ *
+ * @param string $key File key/path
+ * @return string|null Contents, or null when the file does not exist
+ * @throws \Nata\FilesystemManager\Exception\FileStorageException When the storage cannot be asked.
+ */
+    public function read(string $key): ?string {
+        try {
+            $result = $this->_loadS3Client()->getObject([
                 'Bucket' => parent::config('bucket'),
                 'Key' => $this->_normalizeKey($key)
             ]);
-            return true;
         } catch (AwsException $e) {
             if ($e->getStatusCode() === 404) {
-                return false;
+                return null;
             }
-            $this->_setError($e->getMessage());
+            throw new FileStorageException(sprintf('Unable to read "%s" in store "%s": %s', $key, $this->getStoreName(), $e->getMessage()), 0, $e);
         }
-        return false;
+        return (string)$result->get('Body');
     }
 
 /**
@@ -368,7 +449,8 @@ class AwsS3 extends Adapter {
     }
 
 /**
- * Get ACL normalized for AWS S3.
+ * Get ACL normalized for AWS S3: "public" is "public-read", and any other
+ * value with "private" in it (e.g. "private-read") is "private".
  *
  * @param string $acl ACL
  * @return string
@@ -376,8 +458,46 @@ class AwsS3 extends Adapter {
     protected function _getNormalizedAcl(?string $acl) {
         if ($acl === null || $acl == 'public') {
             $acl = 'public-read';
+        } elseif (str_contains($acl, 'private')) {
+            $acl = 'private';
         }
         return $acl;
+    }
+
+/**
+ * ACL of a put: the one given, else the visibility ("public" or
+ * "private"), else the ACL of the store.
+ *
+ * @param string|null $acl ACL given
+ * @param string|null $visibility Visibility given
+ * @return string ACL
+ */
+    protected function _resolveAcl(?string $acl, ?string $visibility): string {
+        if ($acl === null && in_array($visibility, ['public', 'private'], true)) {
+            $acl = $visibility;
+        }
+        return $this->_getNormalizedAcl($acl ?? (string)parent::config('acl'));
+    }
+
+/**
+ * User metadata as S3 accepts it: string values only. Booleans and numbers
+ * become strings; arrays, objects and nulls are left out (S3 refuses the
+ * whole request for one of them).
+ *
+ * @param array $metadata Metadata
+ * @return array<string, string>
+ */
+    protected function _normalizeMetadata(array $metadata): array {
+        $normalized = [];
+        foreach ($metadata as $name => $value) {
+            if (is_bool($value)) {
+                $value = $value ? '1' : '0';
+            }
+            if (is_scalar($value)) {
+                $normalized[(string)$name] = (string)$value;
+            }
+        }
+        return $normalized;
     }
 
 /**
@@ -418,21 +538,28 @@ class AwsS3 extends Adapter {
     }
 
 /**
- * Instantiate an Amazon S3 client.
+ * Amazon S3 client, created once per adapter.
  *
  * @return S3Client
  */
     protected function _loadS3Client() {
-        return new S3Client([
-            'version' => parent::config('version'),
-            'region'  => parent::config('region'),
-            'endpoint' => Text::insert(parent::config('endpoint'), parent::config()),
-            'use_path_style_endpoint' => parent::config('usePathStyleEndpoint'),
-            'credentials' => [
-                'key' => parent::config('publicKey'),
-                'secret' => parent::config('secretKey'),
-            ]
-        ]);
+        if ($this->_client === null) {
+            $options = [
+                'version' => parent::config('version'),
+                'region'  => parent::config('region'),
+                'endpoint' => Text::insert((string)parent::config('endpoint'), array_filter(parent::config(), 'is_scalar')),
+                'use_path_style_endpoint' => parent::config('usePathStyleEndpoint'),
+                'credentials' => [
+                    'key' => parent::config('publicKey'),
+                    'secret' => parent::config('secretKey'),
+                ]
+            ];
+            if (parent::config('handler') !== null) {
+                $options['handler'] = parent::config('handler');
+            }
+            $this->_client = new S3Client($options);
+        }
+        return $this->_client;
     }
 
 }

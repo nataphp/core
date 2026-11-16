@@ -19,6 +19,7 @@ namespace Nata\FilesystemManager\FileStorage;
 
 use Nata\Core\ErrorAwareTrait;
 use Nata\Core\NataObject;
+use Nata\FilesystemManager\Exception\FileStorageException;
 
 /**
  * File storage adapter abstract class.
@@ -127,6 +128,30 @@ abstract class Adapter extends NataObject {
  * @return int|null Size in bytes or null on failure
  */
     abstract public function freeSpace(): ?int;
+
+/**
+ * Information about a stored file: `size`, `etag`, `mime`, `modified`
+ * (Unix timestamp), `metadata` and `checksumSha256` (hex), each null when
+ * the store does not know it. Adapters that support it override this.
+ *
+ * @param string $path File path/key
+ * @return array|null Information, or null when the file does not exist
+ * @throws \Nata\FilesystemManager\Exception\FileStorageException When the adapter does not support it, or the storage cannot be asked.
+ */
+    public function info(string $path): ?array {
+        throw new FileStorageException(sprintf('Store "%s" (%s) does not support info().', $this->getStoreName(), static::class));
+    }
+
+/**
+ * Contents of a stored file. Adapters that support it override this.
+ *
+ * @param string $path File path/key
+ * @return string|null Contents, or null when the file does not exist
+ * @throws \Nata\FilesystemManager\Exception\FileStorageException When the adapter does not support it, or the storage cannot be asked.
+ */
+    public function read(string $path): ?string {
+        throw new FileStorageException(sprintf('Store "%s" (%s) does not support read().', $this->getStoreName(), static::class));
+    }
 
 /**
  * Get last used path.

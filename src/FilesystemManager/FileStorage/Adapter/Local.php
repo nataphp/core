@@ -159,6 +159,56 @@ class Local extends Adapter {
     }
 
 /**
+ * Information about a stored file (see Adapter::info()). The SHA-256 is
+ * computed from the file; there is no ETag nor metadata.
+ *
+ * @param string $path File path
+ * @return array|null Information, or null when the file does not exist
+ */
+    public function info(string $path): ?array {
+        $fullPath = $this->_fullPathOf($path);
+        if (!is_file($fullPath)) {
+            return null;
+        }
+        return [
+            'size' => (int)filesize($fullPath),
+            'etag' => null,
+            'mime' => null,
+            'modified' => (int)filemtime($fullPath),
+            'metadata' => [],
+            'checksumSha256' => hash_file('sha256', $fullPath),
+        ];
+    }
+
+/**
+ * Contents of a stored file.
+ *
+ * @param string $path File path
+ * @return string|null Contents, or null when the file does not exist
+ */
+    public function read(string $path): ?string {
+        $fullPath = $this->_fullPathOf($path);
+        if (!is_file($fullPath)) {
+            return null;
+        }
+        $contents = file_get_contents($fullPath);
+        return $contents === false ? null : $contents;
+    }
+
+/**
+ * Full path of a path/key of the store.
+ *
+ * @param string $path File path/key, or full path
+ * @return string Full path
+ */
+    private function _fullPathOf(string $path): string {
+        if ($this->_isFullFilePath($path)) {
+            return $path;
+        }
+        return $this->_getFullFilePath($this->_getBasePath(), $path);
+    }
+
+/**
  * Get file public URL.
  *
  * @param string $path Path/key
@@ -285,7 +335,8 @@ class Local extends Adapter {
  */
     private function _getBasePath() {
         $basePath = $this->config('root');
-        if (substr($basePath, 0, 1) === '/') {
+        // Absolute ("/srv/…", and "C:/…" on Windows): used as given
+        if ($this->_isFullFilePath($basePath)) {
             return $basePath;
         }
         return App::normalize(App::path($basePath));
