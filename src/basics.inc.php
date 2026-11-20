@@ -23,7 +23,7 @@ use Nata\I18n\Multibyte;
 /**
  * NataPHP version.
  */
-    define('VERSION', '1.1.4');
+    define('VERSION', '1.1.5');
 
 /**
  * Basic defines for timing functions.
