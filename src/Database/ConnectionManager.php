@@ -50,10 +50,10 @@ class ConnectionManager {
  *
  * @see config/database.inc.php for configuration settings
  * @param string $name Name of the configuration
- * @param array $settings Optional associative array of settings
+ * @param array $settings Optional associative array of settings (sensitive: hidden in stack traces)
  * @return void
  */
-    public static function config($config, $settings = []) {
+    public static function config($config, #[\SensitiveParameter] $settings = []) {
         $current = [];
         if (isset(static::$_config[$config])) {
             $current = static::$_config[$config];
@@ -111,11 +111,11 @@ class ConnectionManager {
 /**
  * Create connection at runtime.
  *
- * @param array|string $config Database configuration name
- * @param array $settings Database configuration
+ * @param array|string $config Database configuration name, or the configuration (sensitive)
+ * @param array $settings Database configuration (sensitive: hidden in stack traces)
  * @return Connection
  */
-    public static function create($config, array $settings = []) {
+    public static function create(#[\SensitiveParameter] $config, #[\SensitiveParameter] array $settings = []) {
         if (is_array($config)) {
             $settings = $config;
             $config = rand(10, 100);

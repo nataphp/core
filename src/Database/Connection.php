@@ -24,6 +24,7 @@ use Doctrine\DBAL\DriverManager;
 use Doctrine\DBAL\Result;
 use Doctrine\DBAL\Schema\AbstractSchemaManager;
 use Nata\Core\App;
+use Nata\Database\Driver\PasswordMiddleware;
 use Nata\Core\ClassLoader;
 use Nata\Core\ConfigAwareTrait;
 use Nata\Core\Configure;
@@ -69,14 +70,17 @@ class Connection {
 /**
  * Get SQL Query Builder instance.
  *
+ * The password never stays in the parameters of the Doctrine connection:
+ * it goes to the driver only at connect time (PasswordMiddleware), held by
+ * a Password that prints as an empty object. The configuration is a
+ * sensitive parameter, hidden in stack traces.
+ *
  * @param array $config Database configuration parameters
  * @param Configuration $configuration Database configuration instance
  * @return void
  */
-    public function __construct(array $config, ?Configuration $configuration = null) {
-        if ($configuration === null) {
-            $configuration = new Configuration();
-        }
+    public function __construct(#[\SensitiveParameter] array $config, ?Configuration $configuration = null) {
+        $configuration = $configuration === null ? new Configuration() : clone $configuration;
 
         $config += [
             'driver' => 'pdo_mysql',
@@ -84,8 +88,12 @@ class Connection {
             'dbname' => '',
             'user' => '',
             'password' => '',
-            'charset' => str_replace('-', '', Configure::read('App.encoding'))
+            'charset' => str_replace('-', '', (string)Configure::read('App.encoding'))
         ];
+
+        $password = $config['password'] instanceof Password ? $config['password'] : new Password((string)$config['password']);
+        unset($config['password']);
+        $configuration->setMiddlewares(array_merge($configuration->getMiddlewares(), [new PasswordMiddleware($password)]));
 
         $this->_doctrineConnection = DriverManager::getConnection($config, $configuration);
         $this->_configName = $config['_configName'];
