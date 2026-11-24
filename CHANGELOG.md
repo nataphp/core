@@ -3,7 +3,7 @@
 Notable changes to NataPHP core. Versions follow the git tags (`vX.Y.Z`).
 This file starts at 1.1.5; earlier versions are described by their commits.
 
-## Unreleased
+## 1.1.6 (2026-11-24)
 
 ### Fixes
 
