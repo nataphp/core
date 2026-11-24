@@ -146,8 +146,11 @@ class Input extends Element {
             $maxlength = $this->_length;
         }
 
+        // In characters, not bytes: substr() could cut a multibyte character
+        // in half, and htmlspecialchars() returns '' for invalid UTF-8, so a
+        // value with accents came back to the form empty.
         if ($maxlength && !empty($value)) {
-            $value = substr($value, 0, $maxlength);
+            $value = mb_substr((string)$value, 0, $maxlength);
         }
         return parent::_sanitizer($value, $filter);
     }

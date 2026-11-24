@@ -3,6 +3,35 @@
 Notable changes to NataPHP core. Versions follow the git tags (`vX.Y.Z`).
 This file starts at 1.1.5; earlier versions are described by their commits.
 
+## Unreleased
+
+### Fixes
+
+- **Form lengths count characters, not bytes.** `Input::getValueOutput()` cut
+  the value at `maxLength`/`length` with `substr()`: a cut inside an accented
+  letter is invalid UTF-8, which `htmlspecialchars()` turns into `''`, so a
+  field with accents could come back to the form empty (on an edit form, or
+  after a validation error). It now uses `mb_substr()`. `length` validated with
+  `strlen()` (now `mb_strlen()`), and the `length`, `minLength`, `maxLength`
+  and `between` messages reported the byte count. `maxLength` can be used
+  again instead of `'attrs' => ['maxlength' => …]` plus a check in the table.
+
+### Added
+
+- **`Form::allowFiles()`** (and the `allowFiles` config option). `isValid()`
+  still refuses requests carrying `$_FILES` by default; with `allowFiles` on,
+  a plain multipart form whose controller reads its own file inputs validates
+  normally, without emptying `$_FILES` first. It also sets
+  `enctype="multipart/form-data"`. AJAX forms are sent as JSON and cannot
+  carry files: use it with `ajax(false)`.
+- **`Nata\Cache\RateLimiter`**: sliding-window limiter over a cache
+  configuration (`hit()`, `remaining()`, `reset()`), as copied until now
+  between apps (appontece, acertev, sergiodinislopes.pt).
+- **`Nata\Form\Honeypot`**: bot trap for public forms without session or
+  cookie: a hidden field bots fill, plus a time token signed with
+  `Security.salt` that refuses posts sent faster than `minSeconds`
+  (`html()`, `fields()`, `isBot()`, `reason()`).
+
 ## 1.1.5 (2026-11-20)
 
 ### Security

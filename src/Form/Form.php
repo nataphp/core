@@ -80,6 +80,18 @@ class Form extends NataObject implements Listener, JsonSerializable {
     protected $_ajax = true;
 
 /**
+ * Accept requests that carry files ($_FILES).
+ *
+ * Off by default: the Upload element sends its files to the storage on its
+ * own, so a form post with $_FILES is refused. Turn it on for a plain
+ * multipart form whose controller reads the file inputs itself (an AJAX form
+ * is sent as JSON and cannot carry files, so use it with `ajax(false)`).
+ *
+ * @var bool
+ */
+    protected $_allowFiles = false;
+
+/**
  * Duplicate data.
  *
  * @var bool
@@ -262,6 +274,7 @@ class Form extends NataObject implements Listener, JsonSerializable {
             'action' => null,
             'method' => null,
             'ajax' => null,
+            'allowFiles' => null,
             'duplicate' => null,
             'layout' => null,
             'theme' => null,
@@ -324,6 +337,9 @@ class Form extends NataObject implements Listener, JsonSerializable {
         }
         if ($config['ajax']) {
             $this->_ajax = $config['ajax'];
+        }
+        if ($config['allowFiles']) {
+            $this->allowFiles(true);
         }
         if ($config['action']) {
             $this->action($config['action']);
@@ -611,6 +627,26 @@ class Form extends NataObject implements Listener, JsonSerializable {
             return $this->_ajax;
         }
         $this->_ajax = $ajax;
+        return $this;
+    }
+
+/**
+ * Get/Set whether the form accepts requests carrying files ($_FILES).
+ * Turning it on also sets `enctype="multipart/form-data"`.
+ *
+ * @param bool|null $allowFiles Accept files
+ * @return \Nata\Form\Form|bool
+ */
+    public function allowFiles($allowFiles = null) {
+        if ($allowFiles === null) {
+            return $this->_allowFiles;
+        }
+        $this->_allowFiles = (bool)$allowFiles;
+        // Attributes not built yet get it when they are (attributes()); they
+        // need the request, which a form may not have while it is set up.
+        if ($this->_allowFiles && $this->_attributes !== null) {
+            $this->_attributes->set('enctype', 'multipart/form-data');
+        }
         return $this;
     }
 
@@ -914,6 +950,10 @@ class Form extends NataObject implements Listener, JsonSerializable {
             if ($this->ajax()) {
                 $this->_attributes->addClass('form-ajax');
             }
+
+            if ($this->_allowFiles) {
+                $this->_attributes->set('enctype', 'multipart/form-data');
+            }
         }
         return $this->_attributes;
     }
@@ -1035,7 +1075,7 @@ class Form extends NataObject implements Listener, JsonSerializable {
                 $valid = false;
             }
 
-            if (!empty($_FILES)) {
+            if (!empty($_FILES) && !$this->_allowFiles) {
                 $valid = false;
             }
 

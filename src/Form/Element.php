@@ -1239,7 +1239,7 @@ class Element extends NataObject implements Listener {
             $this->_throwArrayValueException(__FUNCTION__);
         }
 
-        if ($this->_length && !(strlen($data) === $this->_length)) {
+        if ($this->_length && !(mb_strlen((string)$data) === $this->_length)) {
             $this->_error = __('Must have %d characters.', array($this->_length));
             return false;
         }
@@ -1263,7 +1263,7 @@ class Element extends NataObject implements Listener {
         $min = $this->_minLength;
 
         if ($min && !Validation::minLength($data, $min)) {
-            $this->_error = __('%s has %d characters. Must have at least %d characters.', array($this->_label, strlen($data), $min));
+            $this->_error = __('%s has %d characters. Must have at least %d characters.', array($this->_label, mb_strlen((string)$data), $min));
             return false;
         }
 
@@ -1283,7 +1283,7 @@ class Element extends NataObject implements Listener {
         }
         $max = $this->_maxLength;
         if ($max && !Validation::maxLength($data, $max)) {
-            $this->_error = __('%s has %d characters. Must have at most %d characters.', array($this->_label, strlen($data), $max));
+            $this->_error = __('%s has %d characters. Must have at most %d characters.', array($this->_label, mb_strlen((string)$data), $max));
             return false;
         }
         return true;
@@ -1308,7 +1308,7 @@ class Element extends NataObject implements Listener {
                     $this->_label,
                     $min,
                     $max,
-                    strlen($data)
+                    mb_strlen((string)$data)
                 ));
                 return false;
             }
