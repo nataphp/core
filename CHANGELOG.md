@@ -3,6 +3,22 @@
 Notable changes to NataPHP core. Versions follow the git tags (`vX.Y.Z`).
 This file starts at 1.1.5; earlier versions are described by their commits.
 
+## 1.1.7 (2026-11-25)
+
+### Fixes
+
+- **Column names are always quoted.** Conditions (`where`, `andWhere`,
+  `orWhere`, `having`, join conditions, closures and the `QueryExpression`
+  helpers such as `eq()` or `isNull()`) never quoted the column, and `ORDER BY`,
+  `FIELD()`, `SET` and the INSERT columns quoted it only when Doctrine's
+  reserved word list knew it. MariaDB reserves `PORTION` (since 10.4) and no
+  Doctrine list does, so any query naming a column `portion` worked on MySQL and
+  failed on MariaDB with a syntax error -- including the lookup `save()` runs on
+  unique indexes. A plain `column` or `Alias.column` is now quoted part by part
+  with the connection's platform (`Query::quoteColumn()`), or with backticks for
+  an expression built without a query; expressions, function calls and names
+  already quoted are left as they are. Table names and aliases are unchanged.
+
 ## 1.1.6 (2026-11-24)
 
 ### Fixes

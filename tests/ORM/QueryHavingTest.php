@@ -54,7 +54,7 @@ class QueryHavingTest extends TestCase {
     public function testAndHavingJoinsWithAnd(): void {
         $sql = $this->_sql($this->_query()->having(['distance <' => 50])->andHaving(['distance >=' => 25]));
 
-        $this->assertStringContainsString('HAVING (distance < ?) AND (distance >= ?)', $sql);
+        $this->assertStringContainsString('HAVING ("distance" < ?) AND ("distance" >= ?)', $sql);
         $this->assertStringNotContainsString(' OR ', $sql);
     }
 
@@ -66,7 +66,7 @@ class QueryHavingTest extends TestCase {
     public function testOrHavingJoinsWithOr(): void {
         $sql = $this->_sql($this->_query()->having(['distance <' => 5])->orHaving(['distance >' => 100]));
 
-        $this->assertStringContainsString('HAVING (distance < ?) OR (distance > ?)', $sql);
+        $this->assertStringContainsString('HAVING ("distance" < ?) OR ("distance" > ?)', $sql);
     }
 
 /**
@@ -77,7 +77,7 @@ class QueryHavingTest extends TestCase {
     public function testAndHavingAloneStartsTheClause(): void {
         $sql = $this->_sql($this->_query()->andHaving(['total >' => 1]));
 
-        $this->assertStringContainsString('HAVING total > ?', $sql);
+        $this->assertStringContainsString('HAVING "total" > ?', $sql);
     }
 
 }

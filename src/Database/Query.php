@@ -16,6 +16,7 @@
 
 namespace Nata\Database;
 
+use Doctrine\DBAL\Platforms\AbstractPlatform;
 use Doctrine\DBAL\Query\QueryBuilder;
 use Nata\Database\Query\Comparison;
 use Nata\Database\Query\QueryExpression;
@@ -759,7 +760,7 @@ class Query {
             ));
         }
 
-        $expression = new QueryExpression($join['conditions']);
+        $expression = new QueryExpression($join['conditions'], 'AND', $this);
 
         $method = $type === 'left' ? 'leftJoin' : ($type === 'right' ? 'rightJoin' : 'innerJoin');
         $this->_loadBuilder()->{$method}($from['alias'], $join['table'], $join['alias'], $expression->getSql());
@@ -814,7 +815,7 @@ class Query {
             $this->getParameterManager()->reserveFor($conditions, 'where');
         }
 
-        $expr = new QueryExpression($conditions);
+        $expr = new QueryExpression($conditions, 'AND', $this);
         if ($sql = $expr->getSql()) {
             $builder->where($sql);
             $this->getParameterManager()->add($expr->getParams(), 'where');
@@ -881,7 +882,7 @@ class Query {
             $this->getParameterManager()->reserveFor($conditions, 'having');
         }
 
-        $expr = new QueryExpression($conditions);
+        $expr = new QueryExpression($conditions, 'AND', $this);
         if ($sql = $expr->getSql()) {
             $builder->having($sql);
             $this->getParameterManager()->add($expr->getParams(), 'having');
@@ -1069,7 +1070,7 @@ class Query {
                     if (!in_array($direction, ['ASC', 'DESC'], true)) {
                         continue;
                     }
-                    $order = $this->_escapeReservedKeyword($field) . ' ' . $direction;
+                    $order = $this->_quoteColumn($field) . ' ' . $direction;
                 }
 
                 $qb = $this->_loadBuilder();
@@ -1104,7 +1105,7 @@ class Query {
             array_fill(0, count($values), '?')
         );
 
-        $sql = sprintf('FIELD(%s,%s)', $this->_escapeReservedKeyword($field), $placeholders);
+        $sql = sprintf('FIELD(%s,%s)', $this->_quoteColumn($field), $placeholders);
 
         $this->getParameterManager()->add($values, 'orderBy');
 
@@ -1228,7 +1229,7 @@ class Query {
         }
 
         foreach ($fields as $field => $value) {
-            $comp = new Comparison($this->_escapeReservedKeyword($field), $value, Comparison::EQ, null, Comparison::SET);
+            $comp = new Comparison($this->_quoteColumn($field), $value, Comparison::EQ, null, Comparison::SET);
             $sql = $comp->getSql();
             $this->_dbalAdd($builder, 'set', $sql, true);
             $this->getParameterManager()->add($comp->getParams(), 'set');
@@ -1282,7 +1283,7 @@ class Query {
                 continue;
             }
 
-            $this->_loadBuilder()->setValue($this->_escapeReservedKeyword($fieldName), '?');
+            $this->_loadBuilder()->setValue($this->_quoteColumn($fieldName), '?');
             $this->getParameterManager()->add($value, 'values');
         }
 
@@ -1433,6 +1434,43 @@ class Query {
             }
         }
         return $keyword;
+    }
+
+/**
+ * Quote a column name, always, when it is a plain identifier.
+ *
+ * `column` and `Alias.column` are quoted part by part (`Alias`.`column`);
+ * anything else (an expression, a function call, `*`, a name already quoted)
+ * is returned as given. Columns are quoted whether or not they are reserved,
+ * because the reserved word lists do not cover every server: MariaDB reserves
+ * PORTION, MySQL does not, and Doctrine's lists know neither, so a column
+ * named `portion` broke every query on MariaDB that named it.
+ *
+ * @param string $column Column name, optionally prefixed by a table alias.
+ * @param \Doctrine\DBAL\Platforms\AbstractPlatform|null $platform Platform whose quote character is used; backticks when null.
+ * @return string Quoted column, or the input unchanged when it is not a plain identifier.
+ */
+    public static function quoteColumn(string $column, ?AbstractPlatform $platform = null): string {
+        if (!preg_match('/^[A-Za-z_][A-Za-z0-9_]*(?:\.[A-Za-z_][A-Za-z0-9_]*)?$/', $column)) {
+            return $column;
+        }
+
+        $parts = explode('.', $column);
+        foreach ($parts as $index => $part) {
+            $parts[$index] = $platform ? $platform->quoteSingleIdentifier($part) : '`' . $part . '`';
+        }
+
+        return implode('.', $parts);
+    }
+
+/**
+ * Quote a column name with this query's platform.
+ *
+ * @param string $column Column name, optionally prefixed by a table alias.
+ * @return string Quoted column, or the input unchanged when it is not a plain identifier.
+ */
+    public function _quoteColumn(string $column): string {
+        return static::quoteColumn($column, $this->getConnection()->getDatabasePlatform());
     }
 
 /**

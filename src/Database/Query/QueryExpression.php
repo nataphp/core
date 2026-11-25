@@ -118,7 +118,7 @@ class QueryExpression {
  * @return $this
  */
     public function eq($x, $y) {
-        return $this->add(new Comparison($x, $y, Comparison::EQ));
+        return $this->add(new Comparison($this->_column($x), $y, Comparison::EQ));
     }
 
 /**
@@ -135,7 +135,7 @@ class QueryExpression {
  * @return $this
  */
     public function neq($x, $y) {
-        return $this->add(new Comparison($x, $y, Comparison::NEQ));
+        return $this->add(new Comparison($this->_column($x), $y, Comparison::NEQ));
     }
 
 /**
@@ -152,7 +152,7 @@ class QueryExpression {
  * @return $this
  */
     public function lt($x, $y) {
-        return $this->add(new Comparison($x, $y, Comparison::LT));
+        return $this->add(new Comparison($this->_column($x), $y, Comparison::LT));
     }
 
 /**
@@ -169,7 +169,7 @@ class QueryExpression {
  * @return $this
  */
     public function lte($x, $y) {
-        return $this->add(new Comparison($x, $y, Comparison::LTE));
+        return $this->add(new Comparison($this->_column($x), $y, Comparison::LTE));
     }
 
 /**
@@ -186,7 +186,7 @@ class QueryExpression {
  * @return $this
  */
     public function gt($x, $y) {
-        return $this->add(new Comparison($x, $y, Comparison::GT));
+        return $this->add(new Comparison($this->_column($x), $y, Comparison::GT));
     }
 
 /**
@@ -203,7 +203,7 @@ class QueryExpression {
  * @return $this
  */
     public function gte($x, $y) {
-        return $this->add(new Comparison($x, $y, Comparison::GTE));
+        return $this->add(new Comparison($this->_column($x), $y, Comparison::GTE));
     }
 
 /**
@@ -219,7 +219,7 @@ class QueryExpression {
  * @return $this
  */
     public function between($f, $x, $y) {
-        return $this->add(new Comparison($f, [$x, $y], Comparison::BTWN));
+        return $this->add(new Comparison($this->_column($f), [$x, $y], Comparison::BTWN));
     }
 
 /**
@@ -235,7 +235,7 @@ class QueryExpression {
  * @return $this
  */
     public function notBetween(string $f, mixed $x, mixed $y) {
-        return $this->add(new Comparison($f, [$x, $y], Comparison::NBTWN));
+        return $this->add(new Comparison($this->_column($f), [$x, $y], Comparison::NBTWN));
     }
 
 /**
@@ -245,7 +245,7 @@ class QueryExpression {
  * @return $this
  */
     public function isNull(string $x) {
-        return $this->add(new Comparison($x, null, 'IS NULL', 'unary', Comparison::POSTFIX));
+        return $this->add(new Comparison($this->_column($x), null, 'IS NULL', 'unary', Comparison::POSTFIX));
     }
 
 /**
@@ -255,7 +255,7 @@ class QueryExpression {
  * @return $this
  */
     public function isNotNull(string $x) {
-        return $this->add(new Comparison($x, null, 'IS NOT NULL', 'unary', Comparison::POSTFIX));
+        return $this->add(new Comparison($this->_column($x), null, 'IS NOT NULL', 'unary', Comparison::POSTFIX));
     }
 
 /**
@@ -266,7 +266,7 @@ class QueryExpression {
  * @return $this
  */
     public function like(string $x, mixed $y) {
-        return $this->add(new Comparison($x, $y, 'LIKE'));
+        return $this->add(new Comparison($this->_column($x), $y, 'LIKE'));
     }
 
 /**
@@ -277,7 +277,7 @@ class QueryExpression {
  * @return $this
  */
     public function notLike(string $x, mixed $y) {
-        return $this->add(new Comparison($x, $y, 'NOT LIKE'));
+        return $this->add(new Comparison($this->_column($x), $y, 'NOT LIKE'));
     }
 
 /**
@@ -288,7 +288,7 @@ class QueryExpression {
  * @return $this
  */
     public function in(string $x, string|array $y) {
-        return $this->add(new Comparison($x, $y, 'IN'));
+        return $this->add(new Comparison($this->_column($x), $y, 'IN'));
     }
 
 /**
@@ -299,7 +299,7 @@ class QueryExpression {
  * @return $this
  */
     public function notIn(string $x, string|array $y) {
-        return $this->add(new Comparison($x, $y, 'NOT IN'));
+        return $this->add(new Comparison($this->_column($x), $y, 'NOT IN'));
     }
 
 /**
@@ -516,6 +516,7 @@ class QueryExpression {
         $fieldOperator = trim($fieldOperator);
 
         [$field, $operator] = Text::explode(' ', $fieldOperator, false, 2, '');
+        $field = $this->_column($field);
 
         // IN
         if (is_array($value) && stripos($operator, 'in') === false && stripos($operator, 'between') === false) {
@@ -558,9 +559,28 @@ class QueryExpression {
     }
 
 /**
- * Quotes a given input parameter.
+ * Quote the column side of a comparison.
  *
- * @param mixed $input The parameter to be quoted.
+ * Uses the platform of the query this expression belongs to, or backticks
+ * when it was built on its own. Anything that is not a plain column name
+ * (an expression, a function call) is left as it is.
+ *
+ * @param mixed $column Column name, optionally prefixed by a table alias.
+ * @return mixed Quoted column, or the input unchanged.
+ */
+    protected function _column(mixed $column): mixed {
+        if (!is_string($column)) {
+            return $column;
+        }
+        $platform = $this->_query ? $this->_query->getConnection()->getDatabasePlatform() : null;
+        return Query::quoteColumn($column, $platform);
+    }
+
+/**
+ * Merge parameters into this expression's parameters.
+ *
+ * @param array $params Parameters to merge.
+ * @return void
  */
     protected function _mergeParams(array $params): void {
         $this->_params = array_merge($this->_params, $params);
