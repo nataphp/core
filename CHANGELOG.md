@@ -3,6 +3,26 @@
 Notable changes to NataPHP core. Versions follow the git tags (`vX.Y.Z`).
 This file starts at 1.1.5; earlier versions are described by their commits.
 
+## 1.1.8 (2026-11-26)
+
+### Fixes
+
+- **Views of a plugin controller no longer crash.** `Smarty::_paths()` camelized
+  the plugin set on the view with `Inflector::camelize()` without importing it
+  (`Nata\View\Inflector` not found), so any template named without the
+  `Plugin.` prefix in a plugin controller failed with a fatal error.
+
+### Added
+
+- **The app overrides a plugin's templates.** For a plugin template the view
+  now searches `templates/plugin/{Plugin}/{channel}/{prefix}/{folder}/` (up to
+  `templates/plugin/{Plugin}/`) before the plugin's own folders. Before, the
+  plugin always won: the app's file with the same path was only used when the
+  plugin had none, which still works as a fallback (the app's other folders
+  keep their place after the plugin's). This covers layouts and `{include}`s too.
+  Example: `templates/plugin/PlatformAdmin/http/Platform/Dashboard/index.tpl`
+  replaces the plugin's `Platform/Dashboard/index.tpl`.
+
 ## 1.1.7 (2026-11-25)
 
 ### Fixes

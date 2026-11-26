@@ -20,6 +20,7 @@ namespace Nata\View;
 use Nata\Core\App;
 use Nata\Core\Configure;
 use Nata\I18n\I18n;
+use Nata\Utility\Inflector;
 use Nata\View\Smarty\Extension;
 use Nata\View\Smarty\Plugins;
 use Smarty\Smarty as SmartyClass;
@@ -388,8 +389,10 @@ class Smarty extends View {
             return $this->_paths[$_pathKey];
         }
 
-        // Plugin
+        // Plugin: the app's override folder first (templates/plugin/{Plugin}/…),
+        // then the plugin's own templates.
         if ($plugin) {
+            $paths = array_merge($paths, $this->_pluginOverridePaths($plugin, $channel . $basePath . $theme . $path));
             $absolutePath = App::path('Template' . $channel . $basePath . $theme . $path, $plugin);
             $paths = $this->_parentPaths($absolutePath, $paths);
         }
@@ -404,6 +407,28 @@ class Smarty extends View {
         $this->_paths[$_pathKey] = $paths;
 
         return $this->_paths[$_pathKey];
+    }
+
+/**
+ * Folders where the app overrides a plugin's templates: the same relative
+ * path under templates/plugin/{Plugin}/, from the deepest folder up to that
+ * root (never above it, so the app's other templates keep their place after
+ * the plugin's). A missing folder is harmless: Smarty skips it.
+ *
+ * @param string $plugin Plugin name (e.g. 'Notify').
+ * @param string $relative Channel, prefix, theme and folder (e.g. '/http/Platform/Dashboard').
+ * @return array<int, string> Folders, deepest first.
+ */
+    protected function _pluginOverridePaths($plugin, $relative) {
+        $root = rtrim(App::path('Template' . DS . 'plugin' . DS . $plugin), DS);
+        $current = $root . rtrim($relative, DS);
+        $paths = [$current];
+        while (strlen($current) > strlen($root)) {
+            $current = dirname($current);
+            $paths[] = $current;
+        }
+
+        return $paths;
     }
 
 /**
